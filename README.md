@@ -24,8 +24,8 @@ No existe un servidor obligatorio. La aplicación completa puede ejecutarse desd
 - Acontecimientos libres o acotados a áreas y entidades concretas, textos, referencias y fondos múltiples.
 - Capas editables, bloqueables y ocultables.
 - Ejes X e Y generales independientes: inexistentes, numéricos, cronológicos o categóricos, con detalle adaptativo al zoom.
-- Categorías libres, reordenables y con tamaño relativo configurable.
-- Escalas numéricas por tramos: cada intervalo puede tener su propio paso y proporción visual para comprimir periodos dispersos y ampliar los densos.
+- Categorías libres, reordenables, con tamaño relativo y banda de fondo coloreable/transparente en ambos ejes.
+- Escalas numéricas por tramos: cada intervalo puede tener su propio paso, proporción visual, color y opacidad para comprimir periodos dispersos y ampliar los densos.
 - Áreas redimensionables con ocho tiradores, márgenes internos y cuatro modos por orientación: eje general, escala del proyecto local, eje propio o sin eje.
 - Pan temporal con el botón central del ratón, independientemente de la herramienta activa.
 - Separación automática de entidades coincidentes sin alterar sus valores semánticos.
@@ -34,14 +34,19 @@ No existe un servidor obligatorio. La aplicación completa puede ejecutarse desd
 - Transparencia explícita en fondos, bordes, iconos, áreas, textos, acontecimientos, tablero, cuadrícula y colores de conexión.
 - Migración directa de proyectos RELITree / Atlas Studio 4 y 5.
 - Deshacer y rehacer hasta 80 estados.
-- Catálogos de tipos y estados guardados dentro del proyecto.
+- Configuración del proyecto distribuida en pestañas, con edición y eliminación directa de áreas, orden/visibilidad/bloqueo de capas y ayuda contextual.
+- Catálogos de tipos, estados, conexiones, roles, confianza y acontecimientos guardados dentro del proyecto.
+- Esquema de entidades configurable: secciones y campos propios de texto, número, fecha, enlace, lista o sí/no; los valores aparecen en el inspector y en la ficha del visor.
+- SQLite Studio interno con explorador de tablas y vistas, esquema, previsualización de filas, consola SQL y un historial de modificaciones reproducible.
 - Confirmación antes de eliminaciones desde la interfaz.
 
 ## Formatos de salida
 
 ### Proyecto `.atlas.zip`
 
-Incluye `manifest.json`, `project.json`, `project.sqlite` y los recursos incrustados. El mismo editor puede abrir el ZIP, el JSON o la base SQLite.
+Incluye `manifest.json`, `project.json`, `project.sqlite`, `project.svg`, `database/custom.sql`, un visor web completo y los recursos incrustados. El mismo editor puede abrir el ZIP, el JSON o la base SQLite.
+
+El botón **SQLite** abre el estudio de datos. Las consultas de lectura no alteran el proyecto; las sentencias de modificación validadas se guardan en orden y se reaplican al generar la base. Así se pueden mantener tablas, vistas, índices y datos auxiliares propios sin perderlos al volver a abrir el archivo.
 
 ### Visor web
 

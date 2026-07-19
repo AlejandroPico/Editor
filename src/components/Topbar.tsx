@@ -3,10 +3,10 @@ import { Box, Database, Download, FileArchive, FileDown, FilePlus2, FolderOpen, 
 import { useEditorStore } from '../store/editorStore';
 import { createProjectArchive, createViewerArchive, openProjectFile } from '../lib/archive';
 import { downloadBlob, downloadText, safeFileName } from '../lib/download';
-import { projectToDatabase, projectFromDatabase } from '../lib/sqlite';
+import { projectFromDatabase } from '../lib/sqlite';
 import { projectSvg } from '../lib/svgExport';
 
-export function Topbar({ onSettings }: { onSettings: () => void }): React.JSX.Element {
+export function Topbar({ onSettings, onDatabase }: { onSettings: () => void; onDatabase: () => void }): React.JSX.Element {
   const input = useRef<HTMLInputElement>(null);
   const project = useEditorStore(state => state.project);
   const dirty = useEditorStore(state => state.dirty);
@@ -43,7 +43,7 @@ export function Topbar({ onSettings }: { onSettings: () => void }): React.JSX.El
     </div>
     <div className="top-group export-group">
       <button title="Exportar SVG vectorial" onClick={() => downloadText(projectSvg(project), `${name}.svg`, 'image/svg+xml')}><FileDown size={17}/><span>SVG</span></button>
-      <button title="Exportar base de datos SQLite" onClick={() => execute('Generando SQLite…', async () => downloadBlob(new Blob([new Uint8Array(await projectToDatabase(project))], { type: 'application/vnd.sqlite3' }), `${name}.sqlite`))}><Database size={17}/><span>SQLite</span></button>
+      <button title="Abrir SQLite Studio: tablas, datos y consola SQL" onClick={onDatabase}><Database size={17}/><span>SQLite</span></button>
       <button title="Generar visor web interactivo listo para publicar" onClick={() => execute('Generando visor…', async () => downloadBlob(await createViewerArchive(project), `${name}-web.zip`))}><FileArchive size={17}/><span>Visor web</span></button>
       <a className="top-link" href="./downloads/Atlas-Editor-offline.html" download title="Descargar toda la aplicación en un solo HTML"><Download size={17}/><span>Editor offline</span></a>
     </div>

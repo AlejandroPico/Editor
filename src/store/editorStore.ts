@@ -14,7 +14,7 @@ interface EditorState {
   setTool: (tool: Tool) => void;
   setCamera: (camera: Camera) => void;
   select: (selection: Selection, additive?: boolean) => void;
-  setSelection: (selection: Selection[]) => void;
+  setSelection: (selection: Selection[]) => boolean;
   clearSelection: () => void;
   updateProject: (label: string, recipe: (draft: AtlasProject) => void) => void;
   replaceProject: (project: AtlasProject) => void;
@@ -50,7 +50,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const exists = state.selection.some(current => current.type === item.type && current.id === item.id);
     return { selection: exists ? state.selection.filter(current => current.type !== item.type || current.id !== item.id) : [...state.selection, item] };
   }),
-  setSelection: selection => set({ selection }),
+  setSelection: selection => { set({ selection }); return true; },
   clearSelection: () => set({ selection: [] }),
 
   updateProject: (_label, recipe) => set(state => {
@@ -81,7 +81,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       id, title: 'Nueva entidad', subtitle: 'Subtítulo', visibleValue: '', x: x - 70, y: y - 40,
       width: 140, height: 80, rotation: 0, shape: 'rounded', fill: '#ffffff', stroke: '#334155', strokeWidth: 2,
       opacity: 1, iconScale: 1, containerVisible: true, layerId: draft.activeLayerId, type: draft.catalogs.nodeTypes[0]?.id ?? 'entity',
-      status: draft.catalogs.statuses[0]?.id ?? 'active', summary: '', details: { overview: '', history: '', beliefs: '', evidence: '', bibliography: '', notes: '' }, tags: [], areaIds: [],
+      status: draft.catalogs.statuses[0]?.id ?? 'active', summary: '', details: { overview: '', history: '', beliefs: '', evidence: '', bibliography: '', notes: '' }, customFields: {}, tags: [], areaIds: [],
       placement: { mode: 'free', areaId: null, xValue: null, yValue: null, offsetX: 0, offsetY: 0, avoidOverlap: true, durationStart: null, durationEnd: null, durationWidth: 4 }
     }));
     set({ selection: [{ type: 'node', id }], tool: 'select' });

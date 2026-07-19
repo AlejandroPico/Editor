@@ -2,6 +2,7 @@ import type { Area, AtlasProject, AxisDefinition, EdgeEntity, EventEntity, NodeE
 
 export interface Rect { x:number; y:number; width:number; height:number }
 export interface AxisContext { axis:AxisDefinition; start:number; length:number }
+export interface AxisBand { id:string; label:string; start:number; length:number; color:string; opacity:number }
 export const snap=(value:number,step:number)=>Math.round(value/Math.max(1,step))*Math.max(1,step);
 
 export function areaContentRect(area:Area|undefined,project:AtlasProject):Rect{
@@ -39,6 +40,15 @@ export function positionAxisValue(axis:AxisDefinition,position:number,start:numb
   if(axis.mode==='categories'){const total=axis.categories.reduce((sum,item)=>sum+Math.max(.01,item.weight),0);let cursor=0;for(const item of axis.categories){cursor+=Math.max(.01,item.weight)/Math.max(.01,total);if(ratio<=cursor)return item.label}return axis.categories.at(-1)?.label??null}
   const segments=axis.segments.filter(segment=>segment.from!==segment.to);if(segments.length){const total=segments.reduce((sum,item)=>sum+Math.max(.01,item.weight),0);let cursor=0;for(const segment of segments){const share=Math.max(.01,segment.weight)/total;if(ratio<=cursor+share){const local=(ratio-cursor)/share;return segment.from+local*(segment.to-segment.from)}cursor+=share}return segments.at(-1)!.to}
   return axis.min+ratio*(axis.max-axis.min);
+}
+
+export function axisBands(axis:AxisDefinition,start:number,length:number):AxisBand[]{
+  if(axis.mode==='none')return[];
+  const items=axis.mode==='categories'
+    ?axis.categories.map(item=>({id:item.id,label:item.label,weight:item.weight,color:item.color??'transparent',opacity:item.opacity??0}))
+    :axis.segments.map(item=>({id:item.id,label:`${item.from} – ${item.to}`,weight:item.weight,color:item.color??'transparent',opacity:item.opacity??0}));
+  const total=items.reduce((sum,item)=>sum+Math.max(.01,item.weight),0);let cursor=0;
+  return items.map(item=>{const a=cursor/Math.max(.01,total),b=(cursor+=Math.max(.01,item.weight))/Math.max(.01,total),from=axis.reverse?1-b:a,to=axis.reverse?1-a:b;return{id:item.id,label:item.label,start:start+from*length,length:(to-from)*length,color:item.color,opacity:item.opacity}});
 }
 
 function rawNodeRect(node:NodeEntity,project?:AtlasProject):Rect{

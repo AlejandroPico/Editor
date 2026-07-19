@@ -1,4 +1,4 @@
-import { durationSegment, edgePath, eventSegments, nodeCenter, resolvedNodeRect } from './geometry';
+import { axisBands, durationSegment, edgePath, eventSegments, nodeCenter, resolvedNodeRect } from './geometry';
 import type { AtlasProject, NodeEntity } from '../model/project';
 
 const esc=(value:unknown)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
@@ -6,9 +6,12 @@ function shape(node:NodeEntity,rect:{x:number;y:number;width:number;height:numbe
 
 export function projectSvg(project:AtlasProject,includeReferences=false):string{
   const nodes=new Map(project.nodes.map(n=>[n.id,n]));
+  const bandsX=axisBands(project.board.axes.x,60,project.board.width-120),bandsY=axisBands(project.board.axes.y,60,project.board.height-120);
   const gradients=project.edges.filter(e=>e.colors.length>1).map(e=>{const source=nodes.get(e.sourceId),target=nodes.get(e.targetId),a=source?nodeCenter(source,project):{x:0,y:0},b=target?nodeCenter(target,project):{x:1,y:0};return `<linearGradient id="gradient-${esc(e.id)}" gradientUnits="userSpaceOnUse" x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}">${e.colors.map((color,index)=>`<stop offset="${index/Math.max(1,e.colors.length-1)*100}%" stop-color="${esc(color)}"/>`).join('')}</linearGradient>`}).join('');
   const markers=`<marker id="marker-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="context-stroke"/></marker><marker id="marker-circle" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7"><circle cx="5" cy="5" r="4" fill="context-stroke"/></marker><marker id="marker-diamond" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M5 0L10 5L5 10L0 5Z" fill="context-stroke"/></marker><marker id="marker-bar" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7"><path d="M5 0L5 10" stroke="context-stroke" stroke-width="2"/></marker>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${project.board.width}" height="${project.board.height}" viewBox="0 0 ${project.board.width} ${project.board.height}"><defs>${markers}${gradients}</defs><rect width="100%" height="100%" fill="${esc(project.board.background)}" fill-opacity="${project.board.backgroundOpacity}"/>
+  ${bandsX.filter(b=>b.color!=='transparent'&&b.opacity>0).map(b=>`<rect x="${b.start}" y="0" width="${b.length}" height="${project.board.height}" fill="${esc(b.color)}" fill-opacity="${b.opacity}"/>`).join('')}
+  ${bandsY.filter(b=>b.color!=='transparent'&&b.opacity>0).map(b=>`<rect x="0" y="${b.start}" width="${project.board.width}" height="${b.length}" fill="${esc(b.color)}" fill-opacity="${b.opacity}"/>`).join('')}
   ${includeReferences?project.references.filter(r=>r.visible).map(r=>`<image href="${esc(r.dataUrl)}" x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" opacity="${r.opacity}" transform="rotate(${r.rotation} ${r.x+r.width/2} ${r.y+r.height/2})"/>`).join(''):''}
   ${project.areas.map(a=>`<rect x="${a.x}" y="${a.y}" width="${a.width}" height="${a.height}" rx="${a.radius}" fill="${a.fill}" fill-opacity="${a.fillOpacity}" stroke="${a.stroke}" stroke-width="${a.strokeWidth}"/>`).join('')}
   ${project.nodes.map(n=>{const s=durationSegment(n,project);return s?`<line x1="${s.x}" x2="${s.x}" y1="${s.y1}" y2="${s.y2}" stroke="${n.fill}" stroke-width="${s.width}" opacity="${n.opacity*.75}" stroke-linecap="round"/>`:''}).join('')}

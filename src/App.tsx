@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Canvas } from './components/Canvas';
 import { Inspector } from './components/Inspector';
 import { ProjectDialog } from './components/ProjectDialog';
+import { DatabaseDialog } from './components/DatabaseDialog';
 import { Toolbox } from './components/Toolbox';
 import { Topbar } from './components/Topbar';
 import { useEditorStore } from './store/editorStore';
@@ -9,6 +10,7 @@ import type { Tool } from './model/project';
 
 export function App(): React.JSX.Element {
   const [settings, setSettings] = useState(false);
+  const [database, setDatabase] = useState(false);
   const project = useEditorStore(state => state.project);
   const setTool = useEditorStore(state => state.setTool);
   const undo = useEditorStore(state => state.undo);
@@ -28,7 +30,7 @@ export function App(): React.JSX.Element {
       }
       const shortcuts: Record<string, Tool> = { v:'select',h:'pan',n:'node',l:'edge',e:'event',t:'text',r:'reference' };
       const tool = shortcuts[event.key.toLowerCase()]; if (tool) setTool(tool);
-      if (event.key === 'Escape') { setSettings(false); setTool('select'); }
+      if (event.key === 'Escape') { setSettings(false); setDatabase(false); setTool('select'); }
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
@@ -38,11 +40,12 @@ export function App(): React.JSX.Element {
     window.addEventListener('beforeunload', beforeUnload); return () => window.removeEventListener('beforeunload', beforeUnload);
   }, []);
   return <div className="app">
-    <Topbar onSettings={() => setSettings(true)}/>
+    <Topbar onSettings={() => setSettings(true)} onDatabase={() => setDatabase(true)}/>
     <Toolbox/>
     <Canvas/>
     <Inspector/>
     <footer className="statusbar"><span>Formato {project.format} v{project.version}</span><span>Supr: eliminar · Ctrl+Z/Y: historial · rueda: zoom</span><span>{project.board.width} × {project.board.height}</span></footer>
     {settings && <ProjectDialog onClose={() => setSettings(false)}/>} 
+    {database && <DatabaseDialog onClose={() => setDatabase(false)}/>} 
   </div>;
 }

@@ -2,14 +2,19 @@ import JSZip from 'jszip';
 import { normalizeProject, type AtlasProject } from '../model/project';
 import { projectToDatabase } from './sqlite';
 import { interactiveViewerHtml } from './viewer';
+import { projectSvg } from './svgExport';
 
 export async function createProjectArchive(project: AtlasProject): Promise<Blob> {
   const zip = new JSZip();
   const sqlite = await projectToDatabase(project);
-  zip.file('manifest.json', JSON.stringify({ format: project.format, version: project.version, title: project.title, entry: 'project.json', database: 'project.sqlite' }, null, 2));
+  zip.file('manifest.json', JSON.stringify({ format: project.format, version: project.version, title: project.title, entry: 'project.json', database: 'project.sqlite', vector: 'project.svg', viewer: 'viewer/index.html', customSql: 'database/custom.sql' }, null, 2));
   zip.file('project.json', JSON.stringify(project, null, 2));
   zip.file('project.sqlite', sqlite);
-  zip.file('README.txt', 'Proyecto portable de Atlas Editor. Ábrelo desde Archivo > Abrir proyecto.\n');
+  zip.file('project.svg', projectSvg(project));
+  zip.file('viewer/index.html', interactiveViewerHtml(project));
+  zip.file('viewer/data/project.json', JSON.stringify(project, null, 2));
+  zip.file('database/custom.sql', project.database.customSql.join('\n\n-- ────────────────────\n\n'));
+  zip.file('README.txt', 'Paquete completo de Atlas Editor. project.json es la fuente editable; project.sqlite permite consulta; project.svg es la salida vectorial y viewer/index.html es el visor web autónomo.\n');
   return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
 }
 
