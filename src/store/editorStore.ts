@@ -136,7 +136,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         item.x = absolute ? absolute.x - item.width / 2 : item.x + dx; item.y = absolute ? absolute.y - item.height / 2 : item.y + dy;
       } else if (selected.type === 'area') {
         const item = draft.areas.find(area => area.id === selected.id); if (!item) continue;
-        item.x = absolute ? absolute.x - item.width / 2 : item.x + dx; item.y = absolute ? absolute.y - item.height / 2 : item.y + dy;
+        const oldX=item.x,oldY=item.y;item.x = absolute ? absolute.x - item.width / 2 : item.x + dx; item.y = absolute ? absolute.y - item.height / 2 : item.y + dy;
+        const deltaX=item.x-oldX,deltaY=item.y-oldY,selectedAreas=new Set(get().selection.filter(entry=>entry.type==='area').map(entry=>entry.id));let frontier=[item.id],guard=0;
+        while(frontier.length&&guard++<draft.areas.length){const children=draft.areas.filter(area=>area.parentAreaId&&frontier.includes(area.parentAreaId)&&!selectedAreas.has(area.id));frontier=children.map(area=>area.id);for(const child of children){child.x+=deltaX;child.y+=deltaY}}
       }
     }
   }),
@@ -153,6 +155,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       draft.events = draft.events.filter(item => !ids('event').has(item.id));
       draft.texts = draft.texts.filter(item => !ids('text').has(item.id));
       draft.references = draft.references.filter(item => !ids('reference').has(item.id));
+      for(const area of draft.areas)if(area.parentAreaId&&areaIds.has(area.parentAreaId)){let parent=draft.areas.find(item=>item.id===area.parentAreaId)?.parentAreaId??null,guard=0;while(parent&&areaIds.has(parent)&&guard++<draft.areas.length)parent=draft.areas.find(item=>item.id===parent)?.parentAreaId??null;area.parentAreaId=parent}
       draft.areas = draft.areas.filter(item => !ids('area').has(item.id));
       for (const node of draft.nodes) if (node.placement.areaId && areaIds.has(node.placement.areaId)) { const rect=released.get(node.id); if(rect){node.x=rect.x;node.y=rect.y} node.placement.mode='free';node.placement.areaId=null;node.areaIds=node.areaIds.filter(id=>!areaIds.has(id)); }
       for (const event of draft.events) event.areaIds=event.areaIds.filter(id=>!areaIds.has(id));

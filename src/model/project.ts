@@ -1,5 +1,5 @@
 export const PROJECT_FORMAT = 'atlas-editor-project';
-export const PROJECT_VERSION = 4;
+export const PROJECT_VERSION = 5;
 
 export type Id = string;
 export type AxisMode = 'none' | 'timeline' | 'numeric' | 'categories';
@@ -25,6 +25,9 @@ export interface AxisDefinition {
   segments: AxisSegment[];
   visible: boolean;
   reverse: boolean;
+  sticky: boolean;
+  labelSize: number;
+  minLabelSpacing: number;
 }
 
 export interface AreaAxisBinding { mode: AreaAxisMode; visible: boolean; axis: AxisDefinition }
@@ -48,6 +51,10 @@ export interface Layer { id: Id; name: string; visible: boolean; locked: boolean
 export interface Area {
   id: Id;
   name: string;
+  parentAreaId?: Id | null;
+  showTitle?: boolean;
+  titleColor?: string;
+  titleSize?: number;
   x: number;
   y: number;
   width: number;
@@ -228,7 +235,7 @@ export type Selection =
 
 export const uid = (prefix = 'item'): Id => `${prefix}-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 
-export const defaultAxis = (reverse = false): AxisDefinition => ({ mode: 'none', label: '', min: 0, max: 100, step: 10, categories: [], segments: [], visible: false, reverse });
+export const defaultAxis = (reverse = false): AxisDefinition => ({ mode: 'none', label: '', min: 0, max: 100, step: 10, categories: [], segments: [], visible: false, reverse, sticky: true, labelSize: 10, minLabelSpacing: 44 });
 const defaultBinding = (mode:AreaAxisMode,reverse=false):AreaAxisBinding=>({mode,visible:false,axis:defaultAxis(reverse)});
 const defaultPlacement = (): NodePlacement => ({ mode: 'free', areaId: null, xValue: null, yValue: null, offsetX: 0, offsetY: 0, avoidOverlap: true, durationStart: null, durationEnd: null, durationWidth: 4 });
 const defaultDetails = (): Record<string, string> => ({ overview: '', history: '', beliefs: '', evidence: '', bibliography: '', notes: '' });
@@ -274,7 +281,7 @@ function migrateReliTree(value: LegacyObject): AtlasProject {
   let cursor = margin;
   const areas: Area[] = regions.map((region: LegacyObject) => {
     const width = Math.max(180, finite(region.width, 760)), appearance = region.appearance ?? {}, color = region.color ?? '#64748b';
-    const area: Area = { id: String(region.id), name: String(region.name ?? region.id), x: cursor, y: margin, width, height: height - margin * 2, fill: appearance.fillColor ?? color, fillOpacity: finite(appearance.fillOpacity, .055), stroke: appearance.borderColor ?? color, strokeWidth: finite(appearance.borderWidth, 1), radius: 0, padding: { top: 70, right: 34, bottom: 34, left: 34 }, axisBindings:{x:{...defaultBinding('local-project'),visible:false},y:{...defaultBinding('project',true),visible:false}}, layerId: blank.activeLayerId };
+    const area: Area = { id: String(region.id), name: String(region.name ?? region.id), parentAreaId:null, showTitle:true, titleColor:color, titleSize:16, x: cursor, y: margin, width, height: height - margin * 2, fill: appearance.fillColor ?? color, fillOpacity: finite(appearance.fillOpacity, .055), stroke: appearance.borderColor ?? color, strokeWidth: finite(appearance.borderWidth, 1), radius: 0, padding: { top: 70, right: 34, bottom: 34, left: 34 }, axisBindings:{x:{...defaultBinding('local-project'),visible:false},y:{...defaultBinding('project',true),visible:false}}, layerId: blank.activeLayerId };
     cursor += width + gap; return area;
   });
   const width = Math.max(6000, cursor + margin);
@@ -317,7 +324,7 @@ export function normalizeProject(input: unknown): AtlasProject {
   const normalizeAxis=(incoming:LegacyObject|undefined,fallback:AxisDefinition):AxisDefinition=>{const merged={...fallback,...(incoming??{})};return{...merged,categories:(merged.categories??[]).map((item:unknown,index:number)=>typeof item==='string'?{id:`category-${index+1}`,label:item,weight:1,color:'transparent',opacity:0}:{id:String((item as LegacyObject).id??`category-${index+1}`),label:String((item as LegacyObject).label??''),weight:Math.max(.01,finite((item as LegacyObject).weight,1)),color:String((item as LegacyObject).color??'transparent'),opacity:Math.max(0,Math.min(1,finite((item as LegacyObject).opacity,0)))}),segments:(merged.segments??[]).map((item:LegacyObject,index:number)=>({id:String(item.id??`segment-${index+1}`),from:finite(item.from,merged.min),to:finite(item.to,merged.max),step:Math.max(.000001,finite(item.step,merged.step)),weight:Math.max(.01,finite(item.weight,1)),color:String(item.color??'transparent'),opacity:Math.max(0,Math.min(1,finite(item.opacity,0)))}))};};
   const board: Board = { ...blank.board, ...(raw.board ?? {}), axes: { x: normalizeAxis(raw.board?.axes?.x,blank.board.axes.x), y: normalizeAxis(raw.board?.axes?.y ?? legacyAxis,blank.board.axes.y) } };
   delete (board as unknown as LegacyObject).axis;
-  const areas = (raw.areas ?? []).map((area: LegacyObject) => ({ ...area, padding: { top: 28, right: 28, bottom: 28, left: 28, ...(area.padding ?? {}) }, axisBindings:{x:{...defaultBinding(area.axisX===false?'none':'local-project'),...(area.axisBindings?.x??{}),axis:normalizeAxis(area.axisBindings?.x?.axis,blank.board.axes.x)},y:{...defaultBinding(area.axisY===false?'none':'project',true),...(area.axisBindings?.y??{}),axis:normalizeAxis(area.axisBindings?.y?.axis,blank.board.axes.y)}} }));
+  const areas = (raw.areas ?? []).map((area: LegacyObject) => ({ ...area, parentAreaId:area.parentAreaId??null, showTitle:area.showTitle!==false, titleColor:String(area.titleColor??area.stroke??'#334155'), titleSize:Math.max(6,finite(area.titleSize,16)), padding: { top: 28, right: 28, bottom: 28, left: 28, ...(area.padding ?? {}) }, axisBindings:{x:{...defaultBinding(area.axisX===false?'none':'local-project'),...(area.axisBindings?.x??{}),axis:normalizeAxis(area.axisBindings?.x?.axis,blank.board.axes.x)},y:{...defaultBinding(area.axisY===false?'none':'project',true),...(area.axisBindings?.y??{}),axis:normalizeAxis(area.axisBindings?.y?.axis,blank.board.axes.y)}} }));
   const nodes = (raw.nodes ?? []).map((node: LegacyObject) => ({ ...node, shape: node.shape ?? 'rounded', iconScale: finite(node.iconScale, 1), containerVisible: node.containerVisible !== false, details: { ...defaultDetails(), ...(node.details ?? {}) }, customFields: node.customFields ?? {}, tags: node.tags ?? [], areaIds: node.areaIds ?? [], placement: { ...defaultPlacement(), ...(node.placement ?? {}) } }));
   const edges = (raw.edges ?? []).map((edge: LegacyObject) => ({ role:'secondary',strength:60,confidence:'medium',note:'',startMarker:'none',endMarker:edge.directed===false?'none':'arrow',lineCap:'round',avoidOverlap:true,parallelOffset:0,...edge,colors:edge.colors??[],waypoints:edge.waypoints??[] }));
   const events = (raw.events ?? []).map((event: LegacyObject) => ({ scope:'free',areaIds:[],entityIds:[],axisValue:null,endValue:null,...event }));

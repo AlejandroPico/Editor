@@ -13,6 +13,8 @@ describe('formato de proyecto', () => {
     expect(project.references).toEqual([]);
     expect(project.board.axes.x.mode).toBe('none');
     expect(project.board.axes.y.mode).toBe('none');
+    expect(project.board.axes.x.sticky).toBe(true);
+    expect(project.board.axes.y.minLabelSpacing).toBe(44);
   });
   it('normaliza colecciones opcionales sin perder el documento', () => {
     const project = createBlankProject();
@@ -22,6 +24,11 @@ describe('formato de proyecto', () => {
     expect(normalized.id).toBe(project.id);
   });
   it('rechaza JSON ajeno al editor', () => expect(() => normalizeProject({ title: 'otro formato' })).toThrow(/Formato/));
+  it('migra áreas antiguas a títulos visibles y jerarquía vacía',()=>{
+    const project=createBlankProject();
+    const normalized=normalizeProject({...project,areas:[{id:'era',name:'Mesozoico',x:0,y:0,width:500,height:500,fill:'#fff',fillOpacity:.1,stroke:'#000',strokeWidth:1,radius:0,padding:{top:10,right:10,bottom:10,left:10},axisBindings:{x:{mode:'none',visible:false,axis:project.board.axes.x},y:{mode:'none',visible:false,axis:project.board.axes.y}},layerId:project.activeLayerId}]});
+    expect(normalized.areas[0]).toMatchObject({parentAreaId:null,showTitle:true,titleSize:16});
+  });
   it('migra proyectos RELITree/Atlas Studio con regiones, fichas y relaciones', () => {
     const migrated=normalizeProject({schemaVersion:4,application:'Atlas Studio',atlas:{metadata:{presentYear:2026,board:{title:'ReliTree',axisMode:'timeline'}},regions:[{id:'europa',name:'Europa',color:'#4fb26f',order:0,width:700}],traditions:[{id:'a',name:'Origen',regionId:'europa',startYear:-100,placement:{regionId:'europa',xPercent:20},details:{evidence:'fuente'}},{id:'b',name:'Rama',subtitle:'Occidental',regionId:'europa',parentId:'a',startYear:200,placement:{regionId:'europa',xPercent:70}}],relations:[],events:[]}});
     expect(migrated.areas[0].name).toBe('Europa');

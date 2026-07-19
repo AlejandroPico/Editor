@@ -13,12 +13,12 @@ describe('geometría vectorial', () => {
     expect(edgePath(edge,source,target)).toMatch(/^M .*L/);
   });
   it('asigna más espacio visual a los tramos densos',()=>{
-    const axis={mode:'timeline' as const,label:'',min:-10000,max:2000,step:1000,categories:[],segments:[{id:'old',from:-10000,to:-1000,step:1000,weight:1},{id:'dense',from:-1000,to:2000,step:200,weight:3}],visible:true,reverse:false};
+    const axis={mode:'timeline' as const,label:'',min:-10000,max:2000,step:1000,categories:[],segments:[{id:'old',from:-10000,to:-1000,step:1000,weight:1},{id:'dense',from:-1000,to:2000,step:200,weight:3}],visible:true,reverse:false,sticky:true,labelSize:10,minLabelSpacing:44};
     expect(axisValueRatio(axis,-1000)).toBeCloseTo(.25);
     expect(axisValueRatio(axis,2000)).toBeCloseTo(1);
   });
   it('convierte categorías en bandas coloreables proporcionales',()=>{
-    const axis={mode:'categories' as const,label:'',min:0,max:1,step:1,categories:[{id:'a',label:'A',weight:1,color:'#ff0000',opacity:.2},{id:'b',label:'B',weight:3,color:'transparent',opacity:0}],segments:[],visible:false,reverse:false};
+    const axis={mode:'categories' as const,label:'',min:0,max:1,step:1,categories:[{id:'a',label:'A',weight:1,color:'#ff0000',opacity:.2},{id:'b',label:'B',weight:3,color:'transparent',opacity:0}],segments:[],visible:false,reverse:false,sticky:true,labelSize:10,minLabelSpacing:44};
     const bands=axisBands(axis,100,400);
     expect(bands[0]).toMatchObject({start:100,length:100,color:'#ff0000',opacity:.2});
     expect(bands[1].length).toBe(300);

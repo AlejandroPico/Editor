@@ -9,5 +9,8 @@ describe('visor portable', () => {
     expect(html).toContain('<!doctype html>');
     expect(html).toContain('Prueba portable');
     expect(html).toContain('const project=');
+    expect(html).toContain('id="rulers"');
+    expect(html).toContain('function renderRulers()');
+    expect(html).toContain('parentAreaId');
   });
 });
