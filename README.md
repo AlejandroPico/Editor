@@ -1,5 +1,7 @@
 # Atlas Editor
 
+Versión actual: **0.4.0**.
+
 Editor vectorial y portable para construir esquemas, lienzos, infografías, mapas, cronologías y redes interactivas. Es un producto independiente de ReliTree y puede servir como herramienta de autor para cualquier proyecto web.
 
 ## Arquitectura
