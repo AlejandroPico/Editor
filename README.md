@@ -1,6 +1,6 @@
 # Atlas Editor
 
-Versión actual: **0.4.0**.
+Versión actual: **0.5.0**.
 
 Editor vectorial y portable para construir esquemas, lienzos, infografías, mapas, cronologías y redes interactivas. Es un producto independiente de ReliTree y puede servir como herramienta de autor para cualquier proyecto web.
 
@@ -26,9 +26,11 @@ No existe un servidor obligatorio. La aplicación completa puede ejecutarse desd
 - Acontecimientos libres o acotados a áreas y entidades concretas, textos, referencias y fondos múltiples.
 - Capas editables, bloqueables y ocultables.
 - Ejes X e Y generales independientes: inexistentes, numéricos, cronológicos o categóricos, con detalle adaptativo al zoom.
+- Reglas X/Y permanentes y desactivables: permanecen pegadas al borde de la pantalla, reducen automáticamente valores solapados y permiten configurar tamaño y separación mínima.
 - Categorías libres, reordenables, con tamaño relativo y banda de fondo coloreable/transparente en ambos ejes.
 - Escalas numéricas por tramos: cada intervalo puede tener su propio paso, proporción visual, color y opacidad para comprimir periodos dispersos y ampliar los densos.
 - Áreas redimensionables con ocho tiradores, márgenes internos y cuatro modos por orientación: eje general, escala del proyecto local, eje propio o sin eje.
+- Áreas jerárquicas ilimitadas, con títulos configurables y migas de navegación; la regla visible cambia automáticamente al eje de la subárea más profunda.
 - Pan temporal con el botón central del ratón, independientemente de la herramienta activa.
 - Separación automática de entidades coincidentes sin alterar sus valores semánticos.
 - Separación de carriles temporales que considera toda la duración, no sólo el icono.
