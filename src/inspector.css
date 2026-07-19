@@ -14,3 +14,15 @@
 .relation-item small { color: var(--muted); font-size: 8px; }
 .check-list { display: grid; gap: 4px; max-height: 210px; overflow: auto; }
 .check-list label { display: flex; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: 8px; }
+.color-field > div { display: flex; align-items: center; gap: 7px; min-height: 33px; }
+.color-field input[type="color"] { width: 42px; height: 31px; padding: 2px; border: 1px solid var(--line); border-radius: 5px; background: #090d13; }
+.color-field input[type="color"]:disabled { opacity: .3; }
+.color-field label { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: 8px; }
+.axis-row { display: grid; align-items: center; gap: 5px; margin-bottom: 6px; }
+.axis-row input { width: 100%; min-width: 0; height: 31px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 5px; background: #090d13; font-size: 9px; }
+.segment-row { grid-template-columns: repeat(4, minmax(56px,1fr)) repeat(3,auto); }
+.category-row { grid-template-columns: minmax(120px,1fr) 70px repeat(3,auto); }
+.area-axis { margin-bottom: 15px; padding: 11px; border: 1px solid var(--line); border-radius: 7px; background: #0c1017; }
+.gradient-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: end; }
+.axis-break { stroke-dasharray: 2 4; stroke-opacity: .7; }
+.axis-line.local { stroke-opacity: .2; }

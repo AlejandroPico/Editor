@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { edgePath, pointInRect, snap } from '../lib/geometry';
+import { axisValueRatio, edgePath, pointInRect, resolvedNodeRect, snap } from '../lib/geometry';
 import { createBlankProject } from '../model/project';
 
 describe('geometría vectorial', () => {
@@ -9,7 +9,16 @@ describe('geometría vectorial', () => {
     const project = createBlankProject(), layerId = project.activeLayerId;
     const base = { title:'',subtitle:'',visibleValue:'',width:100,height:60,rotation:0,shape:'rounded' as const,fill:'#fff',stroke:'#000',strokeWidth:1,opacity:1,iconScale:1,containerVisible:true,layerId,type:'entity',status:'active',summary:'',details:{},tags:[],areaIds:[],placement:{mode:'free' as const,areaId:null,xValue:null,yValue:null,offsetX:0,offsetY:0,avoidOverlap:true,durationStart:null,durationEnd:null,durationWidth:4} };
     const source={...base,id:'a',x:0,y:0},target={...base,id:'b',x:300,y:200};
-    const edge={id:'e',sourceId:'a',targetId:'b',label:'',kind:'connection',role:'primary',strength:80,confidence:'medium',note:'',route:'orthogonal' as const,directed:true,color:'#000',colors:[],width:2,dash:'',opacity:1,waypoints:[],layerId};
+    const edge={id:'e',sourceId:'a',targetId:'b',label:'',kind:'connection',role:'primary',strength:80,confidence:'medium',note:'',route:'orthogonal' as const,directed:true,startMarker:'none' as const,endMarker:'arrow' as const,lineCap:'round' as const,avoidOverlap:true,parallelOffset:0,color:'#000',colors:[],width:2,dash:'',opacity:1,waypoints:[],layerId};
     expect(edgePath(edge,source,target)).toMatch(/^M .*L/);
+  });
+  it('asigna más espacio visual a los tramos densos',()=>{
+    const axis={mode:'timeline' as const,label:'',min:-10000,max:2000,step:1000,categories:[],segments:[{id:'old',from:-10000,to:-1000,step:1000,weight:1},{id:'dense',from:-1000,to:2000,step:200,weight:3}],visible:true,reverse:false};
+    expect(axisValueRatio(axis,-1000)).toBeCloseTo(.25);
+    expect(axisValueRatio(axis,2000)).toBeCloseTo(1);
+  });
+  it('separa conexiones paralelas del mismo recorrido',()=>{
+    const project=createBlankProject(),layerId=project.activeLayerId,base={title:'',subtitle:'',visibleValue:'',width:50,height:50,rotation:0,shape:'circle' as const,fill:'#fff',stroke:'#000',strokeWidth:1,opacity:1,iconScale:1,containerVisible:true,layerId,type:'entity',status:'active',summary:'',details:{},tags:[],areaIds:[],placement:{mode:'free' as const,areaId:null,xValue:null,yValue:null,offsetX:0,offsetY:0,avoidOverlap:true,durationStart:null,durationEnd:null,durationWidth:4}},a={...base,id:'a',x:0,y:0},b={...base,id:'b',x:300,y:0},edge={id:'e1',sourceId:'a',targetId:'b',label:'',kind:'connection',role:'primary',strength:80,confidence:'medium',note:'',route:'straight' as const,directed:true,startMarker:'none' as const,endMarker:'arrow' as const,lineCap:'round' as const,avoidOverlap:true,parallelOffset:0,color:'#000',colors:[],width:4,dash:'',opacity:1,waypoints:[],layerId};project.nodes=[a,b];project.edges=[edge,{...edge,id:'e2'}];
+    expect(edgePath(project.edges[0],a,b,project)).not.toBe(edgePath(project.edges[1],a,b,project));
   });
 });

@@ -15,7 +15,7 @@ export async function projectToDatabase(project: AtlasProject): Promise<Uint8Arr
   const SQL = await getSql();
   const db = new SQL.Database();
   db.run(`
-    PRAGMA user_version = 1;
+    PRAGMA user_version = 3;
     CREATE TABLE project (id TEXT PRIMARY KEY, title TEXT NOT NULL, format TEXT NOT NULL, version INTEGER NOT NULL, updated_at TEXT NOT NULL, data TEXT NOT NULL);
     CREATE TABLE layers (id TEXT PRIMARY KEY, data TEXT NOT NULL);
     CREATE TABLE areas (id TEXT PRIMARY KEY, data TEXT NOT NULL);

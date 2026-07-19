@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createBlankProject, normalizeProject, uid, type AtlasProject, type Camera, type Point, type Selection, type Tool } from '../model/project';
-import { areaContentRect, nodeCenter, positionAxisValue, resolvedNodeRect, snap } from '../lib/geometry';
+import { axisContext, nodeCenter, positionAxisValue, resolvedNodeRect, snap } from '../lib/geometry';
 
 interface EditorState {
   project: AtlasProject;
@@ -107,7 +107,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const id = uid('edge');
     get().updateProject('Crear conexión', draft => draft.edges.push({
       id, sourceId, targetId: nodeId, label: '', kind: draft.catalogs.edgeKinds[0]?.id ?? 'connection', role: draft.catalogs.edgeRoles[0]?.id ?? 'primary', strength: 80, confidence: draft.catalogs.confidences[1]?.id ?? 'medium', note: '',
-      route: 'curve', directed: true, color: '#475569', colors: [], width: 3, dash: '', opacity: 1,
+      route: 'curve', directed: true, startMarker:'none',endMarker:'arrow',lineCap:'round',avoidOverlap:true,parallelOffset:0,color: '#475569', colors: [], width: 3, dash: '', opacity: 1,
       waypoints: [], layerId: draft.activeLayerId
     }));
     set({ relationSourceId: null, selection: [{ type: 'edge', id }], tool: 'select' });
@@ -118,10 +118,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const item = draft.nodes.find(node => node.id === selected.id); if (!item) continue;
         if (item.placement.mode === 'semantic') {
           const center = nodeCenter(item, draft), next = absolute ?? { x: center.x + dx, y: center.y + dy };
-          const area = draft.areas.find(candidate => candidate.id === item.placement.areaId), rect = areaContentRect(area, draft);
-          if ((!area || area.axisX) && draft.board.axes.x.mode !== 'none') item.placement.xValue = positionAxisValue(draft.board.axes.x, next.x, rect.x, rect.width);
+          const area = draft.areas.find(candidate => candidate.id === item.placement.areaId), xContext=axisContext(draft,area,'x'),yContext=axisContext(draft,area,'y');
+          if (xContext) item.placement.xValue = positionAxisValue(xContext.axis, next.x, xContext.start, xContext.length);
           else item.x = next.x - item.width / 2;
-          if ((!area || area.axisY) && draft.board.axes.y.mode !== 'none') item.placement.yValue = positionAxisValue(draft.board.axes.y, next.y, rect.y, rect.height);
+          if (yContext) item.placement.yValue = positionAxisValue(yContext.axis, next.y, yContext.start, yContext.length);
           else item.y = next.y - item.height / 2;
           item.placement.offsetX = 0; item.placement.offsetY = 0;
         } else { item.x = absolute ? absolute.x - item.width / 2 : item.x + dx; item.y = absolute ? absolute.y - item.height / 2 : item.y + dy; }

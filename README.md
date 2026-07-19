@@ -23,10 +23,15 @@ No existe un servidor obligatorio. La aplicación completa puede ejecutarse desd
 - Conexiones dirigidas rectas, ortogonales o curvas, con origen/destino editables, rol, fuerza, confianza, puntos de paso, grosor, patrón y degradado multicolor.
 - Acontecimientos libres o acotados a áreas y entidades concretas, textos, referencias y fondos múltiples.
 - Capas editables, bloqueables y ocultables.
-- Ejes X e Y independientes: inexistentes, numéricos, cronológicos o categóricos, con detalle adaptativo al zoom.
-- Áreas redimensionables con ocho tiradores, márgenes internos y captura opcional de cada eje.
+- Ejes X e Y generales independientes: inexistentes, numéricos, cronológicos o categóricos, con detalle adaptativo al zoom.
+- Categorías libres, reordenables y con tamaño relativo configurable.
+- Escalas numéricas por tramos: cada intervalo puede tener su propio paso y proporción visual para comprimir periodos dispersos y ampliar los densos.
+- Áreas redimensionables con ocho tiradores, márgenes internos y cuatro modos por orientación: eje general, escala del proyecto local, eje propio o sin eje.
 - Pan temporal con el botón central del ratón, independientemente de la herramienta activa.
 - Separación automática de entidades coincidentes sin alterar sus valores semánticos.
+- Separación de carriles temporales que considera toda la duración, no sólo el icono.
+- Conexiones paralelas separadas automáticamente, con corrección manual, terminales, extremos planos/redondos/cuadrados y degradados de cualquier número de colores.
+- Transparencia explícita en fondos, bordes, iconos, áreas, textos, acontecimientos, tablero, cuadrícula y colores de conexión.
 - Migración directa de proyectos RELITree / Atlas Studio 4 y 5.
 - Deshacer y rehacer hasta 80 estados.
 - Catálogos de tipos y estados guardados dentro del proyecto.

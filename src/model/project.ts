@@ -1,26 +1,33 @@
 export const PROJECT_FORMAT = 'atlas-editor-project';
-export const PROJECT_VERSION = 2;
+export const PROJECT_VERSION = 3;
 
 export type Id = string;
 export type AxisMode = 'none' | 'timeline' | 'numeric' | 'categories';
 export type Tool = 'select' | 'pan' | 'node' | 'edge' | 'event' | 'text' | 'reference';
 export type Shape = 'sphere' | 'circle' | 'rounded' | 'rectangle' | 'diamond' | 'pill';
 export type EdgeRoute = 'straight' | 'orthogonal' | 'curve';
+export type EdgeMarker = 'none' | 'arrow' | 'circle' | 'diamond' | 'bar';
 export type PlacementMode = 'free' | 'semantic';
+export type AreaAxisMode = 'project' | 'local-project' | 'local-custom' | 'none';
 
 export interface Point { x: number; y: number }
 export interface Camera { x: number; y: number; zoom: number }
 
+export interface AxisCategory { id: Id; label: string; weight: number }
+export interface AxisSegment { id: Id; from: number; to: number; step: number; weight: number }
 export interface AxisDefinition {
   mode: AxisMode;
   label: string;
   min: number;
   max: number;
   step: number;
-  categories: string[];
+  categories: AxisCategory[];
+  segments: AxisSegment[];
   visible: boolean;
   reverse: boolean;
 }
+
+export interface AreaAxisBinding { mode: AreaAxisMode; visible: boolean; axis: AxisDefinition }
 
 export interface Board {
   width: number;
@@ -51,8 +58,7 @@ export interface Area {
   strokeWidth: number;
   radius: number;
   padding: { top: number; right: number; bottom: number; left: number };
-  axisX: boolean;
-  axisY: boolean;
+  axisBindings: { x: AreaAxisBinding; y: AreaAxisBinding };
   layerId: Id;
 }
 
@@ -111,6 +117,11 @@ export interface EdgeEntity {
   note: string;
   route: EdgeRoute;
   directed: boolean;
+  startMarker: EdgeMarker;
+  endMarker: EdgeMarker;
+  lineCap: 'butt' | 'round' | 'square';
+  avoidOverlap: boolean;
+  parallelOffset: number;
   color: string;
   colors: string[];
   width: number;
@@ -200,7 +211,8 @@ export type Selection =
 
 export const uid = (prefix = 'item'): Id => `${prefix}-${crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 
-const defaultAxis = (reverse = false): AxisDefinition => ({ mode: 'none', label: '', min: 0, max: 100, step: 10, categories: [], visible: false, reverse });
+export const defaultAxis = (reverse = false): AxisDefinition => ({ mode: 'none', label: '', min: 0, max: 100, step: 10, categories: [], segments: [], visible: false, reverse });
+const defaultBinding = (mode:AreaAxisMode,reverse=false):AreaAxisBinding=>({mode,visible:false,axis:defaultAxis(reverse)});
 const defaultPlacement = (): NodePlacement => ({ mode: 'free', areaId: null, xValue: null, yValue: null, offsetX: 0, offsetY: 0, avoidOverlap: true, durationStart: null, durationEnd: null, durationWidth: 4 });
 const defaultDetails = (): Record<string, string> => ({ overview: '', history: '', beliefs: '', evidence: '', bibliography: '', notes: '' });
 
@@ -236,7 +248,7 @@ function migrateReliTree(value: LegacyObject): AtlasProject {
   let cursor = margin;
   const areas: Area[] = regions.map((region: LegacyObject) => {
     const width = Math.max(180, finite(region.width, 760)), appearance = region.appearance ?? {}, color = region.color ?? '#64748b';
-    const area: Area = { id: String(region.id), name: String(region.name ?? region.id), x: cursor, y: margin, width, height: height - margin * 2, fill: appearance.fillColor ?? color, fillOpacity: finite(appearance.fillOpacity, .055), stroke: appearance.borderColor ?? color, strokeWidth: finite(appearance.borderWidth, 1), radius: 0, padding: { top: 70, right: 34, bottom: 34, left: 34 }, axisX: true, axisY: true, layerId: blank.activeLayerId };
+    const area: Area = { id: String(region.id), name: String(region.name ?? region.id), x: cursor, y: margin, width, height: height - margin * 2, fill: appearance.fillColor ?? color, fillOpacity: finite(appearance.fillOpacity, .055), stroke: appearance.borderColor ?? color, strokeWidth: finite(appearance.borderWidth, 1), radius: 0, padding: { top: 70, right: 34, bottom: 34, left: 34 }, axisBindings:{x:{...defaultBinding('local-project'),visible:false},y:{...defaultBinding('project',true),visible:false}}, layerId: blank.activeLayerId };
     cursor += width + gap; return area;
   });
   const width = Math.max(6000, cursor + margin);
@@ -255,7 +267,7 @@ function migrateReliTree(value: LegacyObject): AtlasProject {
     if (!relation.sourceId || !relation.targetId) return;
     const key = `${relation.sourceId}>${relation.targetId}>${relation.kind ?? ''}`; if (relationKeys.has(key)) return; relationKeys.add(key);
     const visual = relation.visual ?? {};
-    edges.push({ id: String(relation.id ?? fallbackId), sourceId: String(relation.sourceId), targetId: String(relation.targetId), label: String(relation.label ?? ''), kind: String(relation.kind ?? 'connection'), role: String(relation.role ?? 'secondary'), strength: finite(relation.strength, 60), confidence: String(relation.confidence ?? 'medium'), note: String(relation.note ?? ''), route: ['straight','orthogonal','curve'].includes(visual.route) ? visual.route : 'curve', directed: relation.directed !== false, color: visual.color ?? '#475569', colors: [...(visual.gradientColors ?? [])], width: finite(visual.lineWidth, 3), dash: String(visual.lineDash ?? ''), opacity: finite(visual.opacity, .8), waypoints: (visual.waypoints ?? []).map((point: LegacyObject) => ({ x: finite(point.absoluteX, 0), y: finite(point.absoluteY, 0) })), layerId: blank.activeLayerId });
+    edges.push({ id: String(relation.id ?? fallbackId), sourceId: String(relation.sourceId), targetId: String(relation.targetId), label: String(relation.label ?? ''), kind: String(relation.kind ?? 'connection'), role: String(relation.role ?? 'secondary'), strength: finite(relation.strength, 60), confidence: String(relation.confidence ?? 'medium'), note: String(relation.note ?? ''), route: ['straight','orthogonal','curve'].includes(visual.route) ? visual.route : 'curve', directed: relation.directed !== false, startMarker:'none',endMarker:relation.directed===false?'none':'arrow',lineCap:'round',avoidOverlap:true,parallelOffset:0,color: visual.color ?? '#475569', colors: [...(visual.gradientColors ?? [])], width: finite(visual.lineWidth, 3), dash: String(visual.lineDash ?? ''), opacity: finite(visual.opacity, .8), waypoints: (visual.waypoints ?? []).map((point: LegacyObject) => ({ x: finite(point.absoluteX, 0), y: finite(point.absoluteY, 0) })), layerId: blank.activeLayerId });
   };
   for (const relation of atlas.relations ?? []) addRelation(relation, uid('edge'));
   for (const item of traditions) if (item.parentId) addRelation({ sourceId: item.parentId, targetId: item.id, kind: item.relationToParent ?? 'derivation', role: 'primary', confidence: item.confidence }, `parent-${item.parentId}-${item.id}`);
@@ -276,11 +288,12 @@ export function normalizeProject(input: unknown): AtlasProject {
   if (raw.atlas?.traditions && raw.atlas?.regions) return migrateReliTree(raw);
   if (raw.format !== PROJECT_FORMAT) throw new Error('Formato de proyecto desconocido. Se admiten Atlas Editor y RELITree/Atlas Studio.');
   const blank = createBlankProject(), legacyAxis = raw.board?.axis;
-  const board: Board = { ...blank.board, ...(raw.board ?? {}), axes: { x: { ...blank.board.axes.x, ...(raw.board?.axes?.x ?? {}) }, y: { ...blank.board.axes.y, ...(raw.board?.axes?.y ?? legacyAxis ?? {}) } } };
+  const normalizeAxis=(incoming:LegacyObject|undefined,fallback:AxisDefinition):AxisDefinition=>{const merged={...fallback,...(incoming??{})};return{...merged,categories:(merged.categories??[]).map((item:unknown,index:number)=>typeof item==='string'?{id:`category-${index+1}`,label:item,weight:1}:{id:String((item as LegacyObject).id??`category-${index+1}`),label:String((item as LegacyObject).label??''),weight:Math.max(.01,finite((item as LegacyObject).weight,1))}),segments:(merged.segments??[]).map((item:LegacyObject,index:number)=>({id:String(item.id??`segment-${index+1}`),from:finite(item.from,merged.min),to:finite(item.to,merged.max),step:Math.max(.000001,finite(item.step,merged.step)),weight:Math.max(.01,finite(item.weight,1))}))};};
+  const board: Board = { ...blank.board, ...(raw.board ?? {}), axes: { x: normalizeAxis(raw.board?.axes?.x,blank.board.axes.x), y: normalizeAxis(raw.board?.axes?.y ?? legacyAxis,blank.board.axes.y) } };
   delete (board as unknown as LegacyObject).axis;
-  const areas = (raw.areas ?? []).map((area: LegacyObject) => ({ ...area, padding: { top: 28, right: 28, bottom: 28, left: 28, ...(area.padding ?? {}) }, axisX: area.axisX ?? true, axisY: area.axisY ?? true }));
+  const areas = (raw.areas ?? []).map((area: LegacyObject) => ({ ...area, padding: { top: 28, right: 28, bottom: 28, left: 28, ...(area.padding ?? {}) }, axisBindings:{x:{...defaultBinding(area.axisX===false?'none':'local-project'),...(area.axisBindings?.x??{}),axis:normalizeAxis(area.axisBindings?.x?.axis,blank.board.axes.x)},y:{...defaultBinding(area.axisY===false?'none':'project',true),...(area.axisBindings?.y??{}),axis:normalizeAxis(area.axisBindings?.y?.axis,blank.board.axes.y)}} }));
   const nodes = (raw.nodes ?? []).map((node: LegacyObject) => ({ ...node, shape: node.shape ?? 'rounded', iconScale: finite(node.iconScale, 1), containerVisible: node.containerVisible !== false, details: { ...defaultDetails(), ...(node.details ?? {}) }, tags: node.tags ?? [], areaIds: node.areaIds ?? [], placement: { ...defaultPlacement(), ...(node.placement ?? {}) } }));
-  const edges = (raw.edges ?? []).map((edge: LegacyObject) => ({ role:'secondary',strength:60,confidence:'medium',note:'',...edge,colors:edge.colors??[],waypoints:edge.waypoints??[] }));
+  const edges = (raw.edges ?? []).map((edge: LegacyObject) => ({ role:'secondary',strength:60,confidence:'medium',note:'',startMarker:'none',endMarker:edge.directed===false?'none':'arrow',lineCap:'round',avoidOverlap:true,parallelOffset:0,...edge,colors:edge.colors??[],waypoints:edge.waypoints??[] }));
   const events = (raw.events ?? []).map((event: LegacyObject) => ({ scope:'free',areaIds:[],entityIds:[],axisValue:null,endValue:null,...event }));
   return { ...blank, ...raw, version: PROJECT_VERSION, board, layers: raw.layers?.length ? raw.layers : blank.layers, areas, nodes, edges, events, texts: raw.texts ?? [], references: raw.references ?? [], catalogs: { ...blank.catalogs, ...(raw.catalogs ?? {}) }, metadata: raw.metadata ?? {} } as AtlasProject;
 }
