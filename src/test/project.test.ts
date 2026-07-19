@@ -11,7 +11,8 @@ describe('formato de proyecto', () => {
     expect(project.events).toEqual([]);
     expect(project.areas).toEqual([]);
     expect(project.references).toEqual([]);
-    expect(project.board.axis.mode).toBe('none');
+    expect(project.board.axes.x.mode).toBe('none');
+    expect(project.board.axes.y.mode).toBe('none');
   });
   it('normaliza colecciones opcionales sin perder el documento', () => {
     const project = createBlankProject();
@@ -21,4 +22,12 @@ describe('formato de proyecto', () => {
     expect(normalized.id).toBe(project.id);
   });
   it('rechaza JSON ajeno al editor', () => expect(() => normalizeProject({ title: 'otro formato' })).toThrow(/Formato/));
+  it('migra proyectos RELITree/Atlas Studio con regiones, fichas y relaciones', () => {
+    const migrated=normalizeProject({schemaVersion:4,application:'Atlas Studio',atlas:{metadata:{presentYear:2026,board:{title:'ReliTree',axisMode:'timeline'}},regions:[{id:'europa',name:'Europa',color:'#4fb26f',order:0,width:700}],traditions:[{id:'a',name:'Origen',regionId:'europa',startYear:-100,placement:{regionId:'europa',xPercent:20},details:{evidence:'fuente'}},{id:'b',name:'Rama',subtitle:'Occidental',regionId:'europa',parentId:'a',startYear:200,placement:{regionId:'europa',xPercent:70}}],relations:[],events:[]}});
+    expect(migrated.areas[0].name).toBe('Europa');
+    expect(migrated.nodes[0].placement.mode).toBe('semantic');
+    expect(migrated.nodes[0].details.evidence).toBe('fuente');
+    expect(migrated.edges.some(edge=>edge.sourceId==='a'&&edge.targetId==='b')).toBe(true);
+    expect(migrated.metadata.importedFrom).toContain('Atlas Studio');
+  });
 });

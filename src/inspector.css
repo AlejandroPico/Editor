@@ -1,0 +1,16 @@
+.axis-line { stroke-opacity: .12; }
+.axis-line.major { stroke-opacity: .34; stroke-width: 1.4; }
+.resize-handle, .waypoint-handle { fill: #fff; stroke: #2563eb; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: nwse-resize; }
+.handle-n, .handle-s { cursor: ns-resize; }
+.handle-e, .handle-w { cursor: ew-resize; }
+.handle-ne, .handle-sw { cursor: nesw-resize; }
+.waypoint-handle { fill: #dbeafe; cursor: move; }
+.inspector header { z-index: 3; }
+.inspector-tabs { position: sticky; z-index: 2; top: 65px; display: flex; gap: 3px; padding: 7px 8px; border-bottom: 1px solid var(--line); background: #0d1118f5; overflow-x: auto; }
+.inspector-tabs button { flex: 1; min-width: max-content; padding: 7px 6px; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--muted); font-size: 8px; }
+.inspector-tabs button.active { border-color: #826c34; background: #2b2412; color: #f5d77f; }
+.help-dot { display: inline-grid; width: 13px; height: 13px; margin-left: 5px; place-items: center; border: 1px solid #465166; border-radius: 50%; color: #9ca8bb; font-size: 8px; font-style: normal; }
+.relation-item { display: grid; width: 100%; gap: 3px; margin-bottom: 6px; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: #0c1017; text-align: left; font-size: 9px; }
+.relation-item small { color: var(--muted); font-size: 8px; }
+.check-list { display: grid; gap: 4px; max-height: 210px; overflow: auto; }
+.check-list label { display: flex; gap: 6px; padding: 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: 8px; }

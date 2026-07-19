@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createBlankProject, normalizeProject, uid, type AtlasProject, type Camera, type Point, type Selection, type Tool } from '../model/project';
-import { snap } from '../lib/geometry';
+import { areaContentRect, nodeCenter, positionAxisValue, resolvedNodeRect, snap } from '../lib/geometry';
 
 interface EditorState {
   project: AtlasProject;
@@ -80,8 +80,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().updateProject('Añadir entidad', draft => draft.nodes.push({
       id, title: 'Nueva entidad', subtitle: 'Subtítulo', visibleValue: '', x: x - 70, y: y - 40,
       width: 140, height: 80, rotation: 0, shape: 'rounded', fill: '#ffffff', stroke: '#334155', strokeWidth: 2,
-      opacity: 1, layerId: draft.activeLayerId, type: draft.catalogs.nodeTypes[0]?.id ?? 'entity',
-      status: draft.catalogs.statuses[0]?.id ?? 'active', summary: '', details: {}, tags: []
+      opacity: 1, iconScale: 1, containerVisible: true, layerId: draft.activeLayerId, type: draft.catalogs.nodeTypes[0]?.id ?? 'entity',
+      status: draft.catalogs.statuses[0]?.id ?? 'active', summary: '', details: { overview: '', history: '', beliefs: '', evidence: '', bibliography: '', notes: '' }, tags: [], areaIds: [],
+      placement: { mode: 'free', areaId: null, xValue: null, yValue: null, offsetX: 0, offsetY: 0, avoidOverlap: true, durationStart: null, durationEnd: null, durationWidth: 4 }
     }));
     set({ selection: [{ type: 'node', id }], tool: 'select' });
   },
@@ -90,7 +91,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     get().updateProject('Añadir acontecimiento', draft => draft.events.push({
       id, title: 'Nuevo acontecimiento', subtitle: '', x: point.x - 80, y: point.y, width: 160,
       color: '#d97706', lineWidth: 3, dash: '8 6', layerId: draft.activeLayerId,
-      kind: draft.catalogs.eventKinds[0]?.id ?? 'milestone', summary: ''
+      kind: draft.catalogs.eventKinds[0]?.id ?? 'milestone', summary: '', scope: 'free', areaIds: [], entityIds: [], axisValue: null, endValue: null
     }));
     set({ selection: [{ type: 'event', id }], tool: 'select' });
   },
@@ -105,7 +106,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (sourceId === nodeId) return set({ relationSourceId: null });
     const id = uid('edge');
     get().updateProject('Crear conexión', draft => draft.edges.push({
-      id, sourceId, targetId: nodeId, label: '', kind: draft.catalogs.edgeKinds[0]?.id ?? 'connection',
+      id, sourceId, targetId: nodeId, label: '', kind: draft.catalogs.edgeKinds[0]?.id ?? 'connection', role: draft.catalogs.edgeRoles[0]?.id ?? 'primary', strength: 80, confidence: draft.catalogs.confidences[1]?.id ?? 'medium', note: '',
       route: 'curve', directed: true, color: '#475569', colors: [], width: 3, dash: '', opacity: 1,
       waypoints: [], layerId: draft.activeLayerId
     }));
@@ -115,7 +116,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     for (const selected of get().selection) {
       if (selected.type === 'node') {
         const item = draft.nodes.find(node => node.id === selected.id); if (!item) continue;
-        item.x = absolute ? absolute.x - item.width / 2 : item.x + dx; item.y = absolute ? absolute.y - item.height / 2 : item.y + dy;
+        if (item.placement.mode === 'semantic') {
+          const center = nodeCenter(item, draft), next = absolute ?? { x: center.x + dx, y: center.y + dy };
+          const area = draft.areas.find(candidate => candidate.id === item.placement.areaId), rect = areaContentRect(area, draft);
+          if ((!area || area.axisX) && draft.board.axes.x.mode !== 'none') item.placement.xValue = positionAxisValue(draft.board.axes.x, next.x, rect.x, rect.width);
+          else item.x = next.x - item.width / 2;
+          if ((!area || area.axisY) && draft.board.axes.y.mode !== 'none') item.placement.yValue = positionAxisValue(draft.board.axes.y, next.y, rect.y, rect.height);
+          else item.y = next.y - item.height / 2;
+          item.placement.offsetX = 0; item.placement.offsetY = 0;
+        } else { item.x = absolute ? absolute.x - item.width / 2 : item.x + dx; item.y = absolute ? absolute.y - item.height / 2 : item.y + dy; }
       } else if (selected.type === 'event') {
         const item = draft.events.find(event => event.id === selected.id); if (!item) continue;
         item.x = absolute ? absolute.x - item.width / 2 : item.x + dx; item.y = absolute ? absolute.y : item.y + dy;
@@ -135,6 +144,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const selected = get().selection;
     if (!selected.length) return;
     const nodeIds = new Set(selected.filter(item => item.type === 'node').map(item => item.id));
+    const areaIds = new Set(selected.filter(item => item.type === 'area').map(item => item.id));
+    const released = new Map(get().project.nodes.filter(node => node.placement.areaId && areaIds.has(node.placement.areaId)).map(node => [node.id, resolvedNodeRect(node, get().project)]));
     get().updateProject('Eliminar selección', draft => {
       const ids = (type: Selection['type']) => new Set(selected.filter(item => item.type === type).map(item => item.id));
       draft.nodes = draft.nodes.filter(item => !ids('node').has(item.id));
@@ -143,6 +154,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       draft.texts = draft.texts.filter(item => !ids('text').has(item.id));
       draft.references = draft.references.filter(item => !ids('reference').has(item.id));
       draft.areas = draft.areas.filter(item => !ids('area').has(item.id));
+      for (const node of draft.nodes) if (node.placement.areaId && areaIds.has(node.placement.areaId)) { const rect=released.get(node.id); if(rect){node.x=rect.x;node.y=rect.y} node.placement.mode='free';node.placement.areaId=null;node.areaIds=node.areaIds.filter(id=>!areaIds.has(id)); }
+      for (const event of draft.events) event.areaIds=event.areaIds.filter(id=>!areaIds.has(id));
     });
     set({ selection: [] });
   },

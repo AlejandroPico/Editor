@@ -1,27 +1,18 @@
-import { edgePath } from './geometry';
+import { durationSegment, edgePath, eventSegments, resolvedNodeRect } from './geometry';
 import type { AtlasProject, NodeEntity } from '../model/project';
 
-const esc = (value: unknown) => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]!);
+const esc=(value:unknown)=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));
+function shape(node:NodeEntity,rect:{x:number;y:number;width:number;height:number}):string{const{x,y,width:w,height:h}=rect,cx=x+w/2,cy=y+h/2,r=Math.min(w,h)/2;if(node.shape==='sphere'||node.shape==='circle')return `<circle cx="${cx}" cy="${cy}" r="${r}"/>`;if(node.shape==='diamond')return `<path d="M ${cx} ${y} L ${x+w} ${cy} L ${cx} ${y+h} L ${x} ${cy} Z"/>`;return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${node.shape==='pill'?h/2:node.shape==='rounded'?14:0}"/>`}
 
-function nodeShape(node: NodeEntity): string {
-  const { x, y, width: w, height: h } = node;
-  if (node.shape === 'circle') return `<ellipse cx="${x + w / 2}" cy="${y + h / 2}" rx="${w / 2}" ry="${h / 2}"/>`;
-  if (node.shape === 'diamond') return `<path d="M ${x + w / 2} ${y} L ${x + w} ${y + h / 2} L ${x + w / 2} ${y + h} L ${x} ${y + h / 2} Z"/>`;
-  const radius = node.shape === 'pill' ? h / 2 : node.shape === 'rounded' ? 14 : 0;
-  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${radius}"/>`;
-}
-
-export function projectSvg(project: AtlasProject, includeReferences = false): string {
-  const nodeMap = new Map(project.nodes.map(node => [node.id, node]));
-  const gradients = project.edges.filter(edge => edge.colors.length > 1).map(edge => `<linearGradient id="gradient-${esc(edge.id)}"><stop offset="0" stop-color="${esc(edge.colors[0])}"/><stop offset="1" stop-color="${esc(edge.colors.at(-1))}"/></linearGradient>`).join('');
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${project.board.width}" height="${project.board.height}" viewBox="0 0 ${project.board.width} ${project.board.height}">
-  <defs>${gradients}</defs>
-  <rect width="100%" height="100%" fill="${esc(project.board.background)}" fill-opacity="${project.board.backgroundOpacity}"/>
-  ${includeReferences ? project.references.filter(item => item.visible).map(item => `<image href="${esc(item.dataUrl)}" x="${item.x}" y="${item.y}" width="${item.width}" height="${item.height}" opacity="${item.opacity}" transform="rotate(${item.rotation} ${item.x + item.width / 2} ${item.y + item.height / 2})"/>`).join('') : ''}
-  ${project.areas.map(area => `<rect x="${area.x}" y="${area.y}" width="${area.width}" height="${area.height}" rx="${area.radius}" fill="${area.fill}" fill-opacity="${area.fillOpacity}" stroke="${area.stroke}" stroke-width="${area.strokeWidth}"/>`).join('')}
-  ${project.edges.map(edge => { const source = nodeMap.get(edge.sourceId), target = nodeMap.get(edge.targetId); if (!source || !target) return ''; return `<path d="${edgePath(edge, source, target)}" fill="none" stroke="${edge.colors.length > 1 ? `url(#gradient-${esc(edge.id)})` : esc(edge.color)}" stroke-width="${edge.width}" stroke-dasharray="${esc(edge.dash)}" opacity="${edge.opacity}"/>`; }).join('')}
-  ${project.events.map(event => `<g><line x1="${event.x}" x2="${event.x + event.width}" y1="${event.y}" y2="${event.y}" stroke="${event.color}" stroke-width="${event.lineWidth}" stroke-dasharray="${esc(event.dash)}"/><text x="${event.x}" y="${event.y - 10}" fill="${event.color}" font-family="Inter,Arial" font-size="16">${esc(event.title)}</text></g>`).join('')}
-  ${project.nodes.map(node => `<g fill="${node.fill}" stroke="${node.stroke}" stroke-width="${node.strokeWidth}" opacity="${node.opacity}">${nodeShape(node)}${node.iconDataUrl ? `<image href="${esc(node.iconDataUrl)}" x="${node.x + node.width / 2 - 20}" y="${node.y + 8}" width="40" height="40"/>` : ''}<text x="${node.x + node.width / 2}" y="${node.y + node.height + 20}" text-anchor="middle" fill="#0f172a" stroke="none" font-family="Inter,Arial" font-weight="700" font-size="15">${esc(node.title)}</text><text x="${node.x + node.width / 2}" y="${node.y + node.height + 38}" text-anchor="middle" fill="#64748b" stroke="none" font-family="Inter,Arial" font-size="12">${esc(node.subtitle)}</text><text x="${node.x + node.width / 2}" y="${node.y + node.height + 54}" text-anchor="middle" fill="#64748b" stroke="none" font-family="Inter,Arial" font-size="11">${esc(node.visibleValue)}</text></g>`).join('')}
-  ${project.texts.map(text => `<text x="${text.x}" y="${text.y}" text-anchor="${text.align}" fill="${text.color}" font-family="Inter,Arial" font-size="${text.fontSize}" font-weight="${text.fontWeight}">${esc(text.text)}</text>`).join('')}
-</svg>`;
+export function projectSvg(project:AtlasProject,includeReferences=false):string{
+  const nodes=new Map(project.nodes.map(n=>[n.id,n]));
+  const gradients=project.edges.filter(e=>e.colors.length>1).map(e=>`<linearGradient id="gradient-${esc(e.id)}">${e.colors.map((color,index)=>`<stop offset="${index/Math.max(1,e.colors.length-1)*100}%" stop-color="${esc(color)}"/>`).join('')}</linearGradient>`).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${project.board.width}" height="${project.board.height}" viewBox="0 0 ${project.board.width} ${project.board.height}"><defs>${gradients}</defs><rect width="100%" height="100%" fill="${esc(project.board.background)}" fill-opacity="${project.board.backgroundOpacity}"/>
+  ${includeReferences?project.references.filter(r=>r.visible).map(r=>`<image href="${esc(r.dataUrl)}" x="${r.x}" y="${r.y}" width="${r.width}" height="${r.height}" opacity="${r.opacity}" transform="rotate(${r.rotation} ${r.x+r.width/2} ${r.y+r.height/2})"/>`).join(''):''}
+  ${project.areas.map(a=>`<rect x="${a.x}" y="${a.y}" width="${a.width}" height="${a.height}" rx="${a.radius}" fill="${a.fill}" fill-opacity="${a.fillOpacity}" stroke="${a.stroke}" stroke-width="${a.strokeWidth}"/>`).join('')}
+  ${project.nodes.map(n=>{const s=durationSegment(n,project);return s?`<line x1="${s.x}" x2="${s.x}" y1="${s.y1}" y2="${s.y2}" stroke="${n.fill}" stroke-width="${s.width}" opacity="${n.opacity*.75}" stroke-linecap="round"/>`:''}).join('')}
+  ${project.edges.map(e=>{const a=nodes.get(e.sourceId),b=nodes.get(e.targetId);return a&&b?`<path d="${edgePath(e,a,b,project)}" fill="none" stroke="${e.colors.length>1?`url(#gradient-${esc(e.id)})`:esc(e.color)}" stroke-width="${e.width}" stroke-dasharray="${esc(e.dash)}" opacity="${e.opacity}"/>`:''}).join('')}
+  ${project.events.map(e=>{const segments=eventSegments(e,project),first=segments[0];return `<g>${segments.map(s=>`<line x1="${s.x1}" x2="${s.x2}" y1="${s.y}" y2="${s.y}" stroke="${e.color}" stroke-width="${e.lineWidth}" stroke-dasharray="${esc(e.dash)}"/>`).join('')}<text x="${first.x1}" y="${first.y-10}" fill="${e.color}" font-family="Inter,Arial" font-size="16">${esc(e.title)}</text></g>`}).join('')}
+  ${project.nodes.map(n=>{const r=resolvedNodeRect(n,project),cx=r.x+r.width/2,size=Math.min(r.width,r.height)*(n.containerVisible?.58:.9)*n.iconScale;return `<g fill="${n.fill}" stroke="${n.stroke}" stroke-width="${n.strokeWidth}" opacity="${n.opacity}">${n.containerVisible?shape(n,r):''}${n.iconDataUrl?`<image href="${esc(n.iconDataUrl)}" x="${cx-size/2}" y="${r.y+r.height/2-size/2}" width="${size}" height="${size}" preserveAspectRatio="xMidYMid meet"/>`:''}<text x="${cx}" y="${r.y+r.height+20}" text-anchor="middle" fill="#0f172a" stroke="none" font-family="Inter,Arial" font-weight="700" font-size="15">${esc(n.title)}</text><text x="${cx}" y="${r.y+r.height+38}" text-anchor="middle" fill="#64748b" stroke="none" font-family="Inter,Arial" font-size="12">${esc(n.subtitle)}</text><text x="${cx}" y="${r.y+r.height+54}" text-anchor="middle" fill="#64748b" stroke="none" font-family="Inter,Arial" font-size="11">${esc(n.visibleValue)}</text></g>`}).join('')}
+  ${project.texts.map(t=>`<text x="${t.x}" y="${t.y}" text-anchor="${t.align}" fill="${t.color}" font-family="Inter,Arial" font-size="${t.fontSize}" font-weight="${t.fontWeight}">${esc(t.text)}</text>`).join('')}</svg>`;
 }

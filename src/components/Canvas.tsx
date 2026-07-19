@@ -1,152 +1,80 @@
 import { useMemo, useRef, useState } from 'react';
-import { edgePath, nodeCenter, pointInRect } from '../lib/geometry';
+import { durationSegment, edgePath, eventSegments, nodeCenter, pointInRect, resolvedNodeRect } from '../lib/geometry';
 import { useEditorStore } from '../store/editorStore';
-import type { Point, Selection } from '../model/project';
+import type { AxisDefinition, Point, Selection } from '../model/project';
 
 type PointerState =
   | { mode: 'pan'; client: Point }
   | { mode: 'move'; start: Point; current: Point }
   | { mode: 'marquee'; start: Point; current: Point; additive: boolean }
-  | { mode: 'resize-reference'; id: string; handle: string; start: Point; current: Point };
+  | { mode: 'resize-reference' | 'resize-area'; id: string; handle: string; start: Point; current: Point };
 
-const selectedKey = (item: Selection) => `${item.type}:${item.id}`;
+const keyOf = (item: Selection) => `${item.type}:${item.id}`;
+
+function ticks(axis: AxisDefinition, length: number, zoom: number): Array<{ label: string; position: number; major: boolean }> {
+  if (!axis.visible || axis.mode === 'none') return [];
+  const start = 60, usable = length - 120;
+  if (axis.mode === 'categories') return axis.categories.map((label, index) => { const ratio=index/Math.max(1,axis.categories.length-1);return {label,position:start+(axis.reverse?1-ratio:ratio)*usable,major:true}; });
+  const detail = Math.max(1, 2 ** Math.floor(Math.log2(Math.max(1, zoom * 3))));
+  const step = Math.max(.000001, axis.step / detail), first = Math.ceil(axis.min / step) * step;
+  const result: Array<{label:string;position:number;major:boolean}>=[];
+  for(let value=first;value<=axis.max+step/2&&result.length<600;value+=step){const ratio=(value-axis.min)/Math.max(.000001,axis.max-axis.min), visual=axis.reverse?1-ratio:ratio;result.push({label:Number(value.toPrecision(10)).toLocaleString('es-ES'),position:start+visual*usable,major:Math.abs(value/axis.step-Math.round(value/axis.step))<1e-6});}
+  return result;
+}
 
 export function Canvas(): React.JSX.Element {
-  const svg = useRef<SVGSVGElement>(null);
-  const [pointer, setPointer] = useState<PointerState | null>(null);
-  const project = useEditorStore(state => state.project);
-  const camera = useEditorStore(state => state.camera);
-  const tool = useEditorStore(state => state.tool);
-  const selection = useEditorStore(state => state.selection);
-  const relationSourceId = useEditorStore(state => state.relationSourceId);
-  const setCamera = useEditorStore(state => state.setCamera);
-  const select = useEditorStore(state => state.select);
-  const setSelection = useEditorStore(state => state.setSelection);
-  const clearSelection = useEditorStore(state => state.clearSelection);
-  const addNode = useEditorStore(state => state.addNode);
-  const addEvent = useEditorStore(state => state.addEvent);
-  const addText = useEditorStore(state => state.addText);
-  const relationClick = useEditorStore(state => state.relationClick);
-  const moveSelection = useEditorStore(state => state.moveSelection);
-  const updateProject = useEditorStore(state => state.updateProject);
-  const selected = useMemo(() => new Set(selection.map(selectedKey)), [selection]);
-  const visibleLayers = useMemo(() => new Set(project.layers.filter(layer => layer.visible).map(layer => layer.id)), [project.layers]);
-  const nodeMap = useMemo(() => new Map(project.nodes.map(node => [node.id, node])), [project.nodes]);
+  const svg=useRef<SVGSVGElement>(null),[pointer,setPointer]=useState<PointerState|null>(null);
+  const project=useEditorStore(s=>s.project),camera=useEditorStore(s=>s.camera),tool=useEditorStore(s=>s.tool),selection=useEditorStore(s=>s.selection),relationSourceId=useEditorStore(s=>s.relationSourceId);
+  const setCamera=useEditorStore(s=>s.setCamera),select=useEditorStore(s=>s.select),setSelection=useEditorStore(s=>s.setSelection),clearSelection=useEditorStore(s=>s.clearSelection),addNode=useEditorStore(s=>s.addNode),addEvent=useEditorStore(s=>s.addEvent),addText=useEditorStore(s=>s.addText),relationClick=useEditorStore(s=>s.relationClick),moveSelection=useEditorStore(s=>s.moveSelection),updateProject=useEditorStore(s=>s.updateProject);
+  const selected=useMemo(()=>new Set(selection.map(keyOf)),[selection]),visibleLayers=useMemo(()=>new Set(project.layers.filter(x=>x.visible).map(x=>x.id)),[project.layers]),nodeMap=useMemo(()=>new Map(project.nodes.map(x=>[x.id,x])),[project.nodes]);
+  const worldPoint=(event:{clientX:number;clientY:number}):Point=>{const rect=svg.current!.getBoundingClientRect();return{x:(event.clientX-rect.left-camera.x)/camera.zoom,y:(event.clientY-rect.top-camera.y)/camera.zoom}};
 
-  const worldPoint = (event: { clientX: number; clientY: number }): Point => {
-    const rect = svg.current!.getBoundingClientRect();
-    return { x: (event.clientX - rect.left - camera.x) / camera.zoom, y: (event.clientY - rect.top - camera.y) / camera.zoom };
-  };
-  const beginPointer = (event: React.PointerEvent<SVGSVGElement>) => {
-    if (event.button !== 0) return;
-    const target = (event.target as Element).closest<SVGElement>('[data-kind]');
-    const point = worldPoint(event);
-    if (tool === 'node') return addNode(point);
-    if (tool === 'event') return addEvent(point);
-    if (tool === 'text') return addText(point);
-    if (tool === 'edge' && target?.dataset.kind === 'node') return relationClick(target.dataset.id!);
-    if (target && tool !== 'pan') {
-      const rawKind = target.dataset.kind!;
-      const id = target.dataset.id!;
-      if (rawKind === 'reference-handle') {
-        setPointer({ mode: 'resize-reference', id, handle: target.dataset.handle!, start: point, current: point });
-      } else {
-        const kind = rawKind as Selection['type'];
-        const item = { type: kind, id } as Selection;
-        select(item, event.shiftKey);
-        setPointer({ mode: 'move', start: point, current: point });
-      }
-      event.currentTarget.setPointerCapture(event.pointerId);
-      return;
+  const beginPointer=(event:React.PointerEvent<SVGSVGElement>)=>{
+    if(event.button===1){event.preventDefault();setPointer({mode:'pan',client:{x:event.clientX,y:event.clientY}});event.currentTarget.setPointerCapture(event.pointerId);return}
+    if(event.button!==0)return;
+    const target=(event.target as Element).closest<SVGElement>('[data-kind]'),point=worldPoint(event);
+    if(tool==='node')return addNode(point);if(tool==='event')return addEvent(point);if(tool==='text')return addText(point);
+    if(tool==='edge'&&target?.dataset.kind==='node')return relationClick(target.dataset.id!);
+    if(target&&tool!=='pan'){
+      const raw=target.dataset.kind!,id=target.dataset.id!;
+      if(raw==='reference-handle'||raw==='area-handle')setPointer({mode:raw==='area-handle'?'resize-area':'resize-reference',id,handle:target.dataset.handle!,start:point,current:point});
+      else{const item={type:raw as Selection['type'],id} as Selection;select(item,event.shiftKey);setPointer({mode:'move',start:point,current:point});}
+      event.currentTarget.setPointerCapture(event.pointerId);return;
     }
-    if (tool === 'pan') setPointer({ mode: 'pan', client: { x: event.clientX, y: event.clientY } });
-    else { if (!event.shiftKey) clearSelection(); setPointer({ mode: 'marquee', start: point, current: point, additive: event.shiftKey }); }
+    if(tool==='pan')setPointer({mode:'pan',client:{x:event.clientX,y:event.clientY}});else{if(!event.shiftKey)clearSelection();setPointer({mode:'marquee',start:point,current:point,additive:event.shiftKey})}
     event.currentTarget.setPointerCapture(event.pointerId);
   };
-  const movePointer = (event: React.PointerEvent<SVGSVGElement>) => {
-    if (!pointer) return;
-    if (pointer.mode === 'pan') {
-      setCamera({ ...camera, x: camera.x + event.clientX - pointer.client.x, y: camera.y + event.clientY - pointer.client.y });
-      setPointer({ mode: 'pan', client: { x: event.clientX, y: event.clientY } });
-    } else setPointer({ ...pointer, current: worldPoint(event) });
+  const movePointer=(event:React.PointerEvent<SVGSVGElement>)=>{if(!pointer)return;if(pointer.mode==='pan'){setCamera({...camera,x:camera.x+event.clientX-pointer.client.x,y:camera.y+event.clientY-pointer.client.y});setPointer({mode:'pan',client:{x:event.clientX,y:event.clientY}})}else setPointer({...pointer,current:worldPoint(event)});};
+  const endPointer=(event:React.PointerEvent<SVGSVGElement>)=>{
+    if(!pointer)return;
+    if(pointer.mode==='move'){const dx=pointer.current.x-pointer.start.x,dy=pointer.current.y-pointer.start.y;if(Math.abs(dx)+Math.abs(dy)>.5)moveSelection(dx,dy)}
+    else if(pointer.mode==='marquee'){const found:Selection[]=[];for(const node of project.nodes)if(pointInRect(nodeCenter(node,project),pointer.start,pointer.current))found.push({type:'node',id:node.id});for(const item of project.events)if(pointInRect({x:item.x+item.width/2,y:item.y},pointer.start,pointer.current))found.push({type:'event',id:item.id});for(const item of project.texts)if(pointInRect({x:item.x,y:item.y},pointer.start,pointer.current))found.push({type:'text',id:item.id});for(const item of project.references)if(pointInRect({x:item.x+item.width/2,y:item.y+item.height/2},pointer.start,pointer.current))found.push({type:'reference',id:item.id});setSelection(pointer.additive?[...selection,...found.filter(x=>!selected.has(keyOf(x)))]:found)}
+    else if(pointer.mode==='resize-reference'){const original=project.references.find(x=>x.id===pointer.id);if(original){const dx=pointer.current.x-pointer.start.x,dy=pointer.current.y-pointer.start.y;updateProject('Redimensionar referencia',draft=>{const item=draft.references.find(x=>x.id===pointer.id)!,west=pointer.handle.includes('w'),north=pointer.handle.includes('n');let width=Math.max(20,original.width+(west?-dx:dx)),height=Math.max(20,original.height+(north?-dy:dy));if(original.lockAspect||event.shiftKey){const ratio=original.width/original.height;if(Math.abs(dx)>=Math.abs(dy))height=width/ratio;else width=height*ratio}if(west)item.x=original.x+original.width-width;if(north)item.y=original.y+original.height-height;item.width=width;item.height=height})}}
+    else if(pointer.mode==='resize-area'){const original=project.areas.find(x=>x.id===pointer.id);if(original){const dx=pointer.current.x-pointer.start.x,dy=pointer.current.y-pointer.start.y;updateProject('Redimensionar área',draft=>{const item=draft.areas.find(x=>x.id===pointer.id)!,w=pointer.handle.includes('w'),e=pointer.handle.includes('e'),n=pointer.handle.includes('n'),s=pointer.handle.includes('s');if(w){item.x=Math.min(original.x+original.width-80,original.x+dx);item.width=original.width+original.x-item.x}if(e)item.width=Math.max(80,original.width+dx);if(n){item.y=Math.min(original.y+original.height-80,original.y+dy);item.height=original.height+original.y-item.y}if(s)item.height=Math.max(80,original.height+dy)})}}
+    if(event.currentTarget.hasPointerCapture(event.pointerId))event.currentTarget.releasePointerCapture(event.pointerId);setPointer(null);
   };
-  const endPointer = (event: React.PointerEvent<SVGSVGElement>) => {
-    if (!pointer) return;
-    if (pointer.mode === 'move') {
-      const dx = pointer.current.x - pointer.start.x, dy = pointer.current.y - pointer.start.y;
-      if (Math.abs(dx) + Math.abs(dy) > .5) moveSelection(dx, dy);
-    } else if (pointer.mode === 'marquee') {
-      const found: Selection[] = [];
-      for (const node of project.nodes) if (pointInRect(nodeCenter(node), pointer.start, pointer.current)) found.push({ type: 'node', id: node.id });
-      for (const item of project.events) if (pointInRect({ x: item.x + item.width / 2, y: item.y }, pointer.start, pointer.current)) found.push({ type: 'event', id: item.id });
-      for (const item of project.texts) if (pointInRect({ x: item.x, y: item.y }, pointer.start, pointer.current)) found.push({ type: 'text', id: item.id });
-      for (const item of project.references) if (pointInRect({ x: item.x + item.width / 2, y: item.y + item.height / 2 }, pointer.start, pointer.current)) found.push({ type: 'reference', id: item.id });
-      setSelection(pointer.additive ? [...selection, ...found.filter(item => !selected.has(selectedKey(item)))] : found);
-    } else if (pointer.mode === 'resize-reference') {
-      const ref = project.references.find(item => item.id === pointer.id);
-      if (ref) {
-        const dx = pointer.current.x - pointer.start.x, dy = pointer.current.y - pointer.start.y;
-        updateProject('Redimensionar referencia', draft => {
-          const item = draft.references.find(reference => reference.id === pointer.id)!;
-          const west = pointer.handle.includes('w'), north = pointer.handle.includes('n');
-          let width = Math.max(20, ref.width + (west ? -dx : dx));
-          let height = Math.max(20, ref.height + (north ? -dy : dy));
-          if (ref.lockAspect || event.shiftKey) {
-            const ratio = ref.width / ref.height;
-            if (Math.abs(dx) >= Math.abs(dy)) height = width / ratio; else width = height * ratio;
-          }
-          if (west) item.x = ref.x + ref.width - width;
-          if (north) item.y = ref.y + ref.height - height;
-          item.width = width; item.height = height;
-        });
-      }
-    }
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    setPointer(null);
-  };
-  const wheel = (event: React.WheelEvent<SVGSVGElement>) => {
-    event.preventDefault();
-    const rect = svg.current!.getBoundingClientRect(), px = event.clientX - rect.left, py = event.clientY - rect.top;
-    const wx = (px - camera.x) / camera.zoom, wy = (py - camera.y) / camera.zoom;
-    const zoom = Math.max(.03, Math.min(8, camera.zoom * Math.exp(-event.deltaY * .0012)));
-    setCamera({ zoom, x: px - wx * zoom, y: py - wy * zoom });
-  };
-  const axisRows = useMemo(() => {
-    const axis = project.board.axis;
-    if (!axis.visible || axis.mode === 'none') return [];
-    if (axis.mode === 'categories') return axis.categories.map((label, index) => ({ label, y: 120 + index * Math.max(80, (project.board.height - 240) / Math.max(1, axis.categories.length - 1)) }));
-    const rows: Array<{ label: string; y: number }> = [];
-    for (let value = axis.min; value <= axis.max + axis.step / 2 && rows.length < 500; value += Math.max(.0001, axis.step)) rows.push({ label: String(value), y: 120 + (axis.max - value) / Math.max(1, axis.max - axis.min) * (project.board.height - 240) });
-    return rows;
-  }, [project.board]);
-  const preview = pointer?.mode === 'move' ? { x: pointer.current.x - pointer.start.x, y: pointer.current.y - pointer.start.y } : { x: 0, y: 0 };
-  const offset = (type: Selection['type'], id: string) => selected.has(`${type}:${id}`) ? preview : { x: 0, y: 0 };
+  const wheel=(event:React.WheelEvent<SVGSVGElement>)=>{event.preventDefault();const rect=svg.current!.getBoundingClientRect(),px=event.clientX-rect.left,py=event.clientY-rect.top,wx=(px-camera.x)/camera.zoom,wy=(py-camera.y)/camera.zoom,zoom=Math.max(.03,Math.min(8,camera.zoom*Math.exp(-event.deltaY*.0012)));setCamera({zoom,x:px-wx*zoom,y:py-wy*zoom})};
+  const axisTicks=useMemo(()=>({x:ticks(project.board.axes.x,project.board.width,camera.zoom),y:ticks(project.board.axes.y,project.board.height,camera.zoom)}),[project.board,camera.zoom]);
+  const preview=pointer?.mode==='move'?{x:pointer.current.x-pointer.start.x,y:pointer.current.y-pointer.start.y}:{x:0,y:0},offset=(type:Selection['type'],id:string)=>selected.has(`${type}:${id}`)?preview:{x:0,y:0};
+  const handles=(item:{x:number;y:number;width:number;height:number})=>[['nw',item.x,item.y],['n',item.x+item.width/2,item.y],['ne',item.x+item.width,item.y],['e',item.x+item.width,item.y+item.height/2],['se',item.x+item.width,item.y+item.height],['s',item.x+item.width/2,item.y+item.height],['sw',item.x,item.y+item.height],['w',item.x,item.y+item.height/2]] as Array<[string,number,number]>;
 
-  return <main className="canvas-shell" data-tool={tool}>
-    <svg ref={svg} className="canvas" onPointerDown={beginPointer} onPointerMove={movePointer} onPointerUp={endPointer} onPointerCancel={endPointer} onWheel={wheel}>
-      <defs>
-        <pattern id="grid" width={project.board.gridSize} height={project.board.gridSize} patternUnits="userSpaceOnUse"><path d={`M ${project.board.gridSize} 0 L 0 0 0 ${project.board.gridSize}`} fill="none" stroke={project.board.gridColor} strokeOpacity={project.board.gridOpacity} strokeWidth="1" vectorEffect="non-scaling-stroke"/></pattern>
-        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker>
-        {project.edges.filter(edge => edge.colors.length > 1).map(edge => <linearGradient key={edge.id} id={`gradient-${edge.id}`}><stop offset="0" stopColor={edge.colors[0]}/><stop offset="1" stopColor={edge.colors.at(-1)}/></linearGradient>)}
-      </defs>
-      <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.zoom})`}>
-        <rect width={project.board.width} height={project.board.height} fill={project.board.background} fillOpacity={project.board.backgroundOpacity}/>
-        {project.board.gridVisible && <rect width={project.board.width} height={project.board.height} fill="url(#grid)"/>}
-        {project.references.filter(item => item.visible && visibleLayers.has(item.layerId)).map(item => { const d = offset('reference', item.id); return <g key={item.id} data-kind="reference" data-id={item.id} transform={`translate(${d.x} ${d.y}) rotate(${item.rotation} ${item.x + item.width / 2} ${item.y + item.height / 2})`}><image href={item.dataUrl} x={item.x} y={item.y} width={item.width} height={item.height} opacity={item.opacity} preserveAspectRatio="none"/>{selected.has(`reference:${item.id}`) && <><rect className="selection-box" x={item.x} y={item.y} width={item.width} height={item.height}/>{[['nw',item.x,item.y],['ne',item.x+item.width,item.y],['sw',item.x,item.y+item.height],['se',item.x+item.width,item.y+item.height]].map(([handle,x,y]) => <circle key={String(handle)} data-kind="reference-handle" data-id={item.id} data-handle={handle} className="resize-handle" cx={Number(x)} cy={Number(y)} r={8 / camera.zoom}/>)}</>}</g>; })}
-        {project.areas.filter(item => visibleLayers.has(item.layerId)).map(item => <rect key={item.id} data-kind="area" data-id={item.id} x={item.x} y={item.y} width={item.width} height={item.height} rx={item.radius} fill={item.fill} fillOpacity={item.fillOpacity} stroke={item.stroke} strokeWidth={item.strokeWidth} className={selected.has(`area:${item.id}`) ? 'selected-object' : ''}/>)}
-        {axisRows.map(row => <g key={`${row.label}-${row.y}`}><line x1="0" x2={project.board.width} y1={row.y} y2={row.y} className="axis-line"/><text x="18" y={row.y - 7} className="axis-label">{row.label}</text></g>)}
-        {project.edges.filter(item => visibleLayers.has(item.layerId)).map(edge => { const source = nodeMap.get(edge.sourceId), target = nodeMap.get(edge.targetId); if (!source || !target) return null; const path = edgePath(edge, source, target); return <g key={edge.id} data-kind="edge" data-id={edge.id} className={selected.has(`edge:${edge.id}`) ? 'selected-object' : ''}><path d={path} fill="none" stroke={edge.colors.length > 1 ? `url(#gradient-${edge.id})` : edge.color} strokeWidth={edge.width} strokeDasharray={edge.dash} opacity={edge.opacity} markerEnd={edge.directed ? 'url(#arrow)' : undefined} className="edge-path"/><path d={path} fill="none" stroke="transparent" strokeWidth={Math.max(16, edge.width + 10)} className="edge-hit"/></g>; })}
-        {project.events.filter(item => visibleLayers.has(item.layerId)).map(item => { const d = offset('event', item.id); return <g key={item.id} data-kind="event" data-id={item.id} transform={`translate(${d.x} ${d.y})`} className={selected.has(`event:${item.id}`) ? 'selected-object' : ''}><line x1={item.x} x2={item.x + item.width} y1={item.y} y2={item.y} stroke={item.color} strokeWidth={item.lineWidth} strokeDasharray={item.dash}/><path d={`M ${item.x} ${item.y} L ${item.x + item.width} ${item.y}`} stroke="transparent" strokeWidth="20"/><text x={item.x} y={item.y - 11} fill={item.color} className="event-title">{item.title}</text></g>; })}
-        {project.nodes.filter(item => visibleLayers.has(item.layerId)).map(node => { const d = offset('node', node.id), x=node.x+d.x,y=node.y+d.y, centerX=x+node.width/2,centerY=y+node.height/2; return <g key={node.id} data-kind="node" data-id={node.id} className={`node-object ${selected.has(`node:${node.id}`) ? 'selected-object' : ''}`} opacity={node.opacity} transform={`rotate(${node.rotation} ${centerX} ${centerY})`}>
-          {node.shape === 'circle' ? <ellipse cx={centerX} cy={centerY} rx={node.width/2} ry={node.height/2} fill={node.fill} stroke={node.stroke} strokeWidth={node.strokeWidth}/>: node.shape === 'diamond' ? <path d={`M ${centerX} ${y} L ${x+node.width} ${centerY} L ${centerX} ${y+node.height} L ${x} ${centerY} Z`} fill={node.fill} stroke={node.stroke} strokeWidth={node.strokeWidth}/>:<rect x={x} y={y} width={node.width} height={node.height} rx={node.shape === 'pill' ? node.height/2 : node.shape === 'rounded' ? 14 : 0} fill={node.fill} stroke={node.stroke} strokeWidth={node.strokeWidth}/>} 
-          {node.iconDataUrl && <><rect x={centerX-24} y={y+7} width="48" height="48" rx="24" fill={node.iconBackground || 'transparent'}/><image href={node.iconDataUrl} x={centerX-20} y={y+11} width="40" height="40" style={{ filter: node.iconInvert ? 'invert(1)' : undefined }}/></>}
-          <text x={centerX} y={y+node.height+21} textAnchor="middle" className="node-title">{node.title}</text><text x={centerX} y={y+node.height+39} textAnchor="middle" className="node-subtitle">{node.subtitle}</text><text x={centerX} y={y+node.height+55} textAnchor="middle" className="node-value">{node.visibleValue}</text>
-          {relationSourceId === node.id && <circle cx={centerX} cy={centerY} r={Math.max(node.width,node.height)/2+12} className="relation-source"/>}
-        </g>; })}
-        {project.texts.filter(item => visibleLayers.has(item.layerId)).map(item => { const d=offset('text',item.id);return <text key={item.id} data-kind="text" data-id={item.id} x={item.x+d.x} y={item.y+d.y} textAnchor={item.align} fill={item.color} fontSize={item.fontSize} fontWeight={item.fontWeight} className={selected.has(`text:${item.id}`)?'selected-text':''}>{item.text}</text>})}
-        {pointer?.mode === 'marquee' && <rect className="marquee" x={Math.min(pointer.start.x,pointer.current.x)} y={Math.min(pointer.start.y,pointer.current.y)} width={Math.abs(pointer.current.x-pointer.start.x)} height={Math.abs(pointer.current.y-pointer.start.y)}/>} 
-      </g>
-    </svg>
-    <div className="canvas-status"><span>{Math.round(camera.zoom * 100)}%</span><span>{project.nodes.length} entidades · {project.edges.length} conexiones · {project.events.length} acontecimientos</span></div>
-  </main>;
+  return <main className="canvas-shell" data-tool={tool}><svg ref={svg} className="canvas" onPointerDown={beginPointer} onPointerMove={movePointer} onPointerUp={endPointer} onPointerCancel={endPointer} onWheel={wheel} onContextMenu={event=>event.preventDefault()}>
+    <defs><pattern id="grid" width={project.board.gridSize} height={project.board.gridSize} patternUnits="userSpaceOnUse"><path d={`M ${project.board.gridSize} 0 L 0 0 0 ${project.board.gridSize}`} fill="none" stroke={project.board.gridColor} strokeOpacity={project.board.gridOpacity} strokeWidth="1" vectorEffect="non-scaling-stroke"/></pattern><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke"/></marker>{project.edges.filter(e=>e.colors.length>1).map(e=><linearGradient key={e.id} id={`gradient-${e.id}`}>{e.colors.map((color,index)=><stop key={index} offset={`${index/Math.max(1,e.colors.length-1)*100}%`} stopColor={color}/>)}</linearGradient>)}</defs>
+    <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.zoom})`}>
+      <rect width={project.board.width} height={project.board.height} fill={project.board.background} fillOpacity={project.board.backgroundOpacity}/>{project.board.gridVisible&&<rect width={project.board.width} height={project.board.height} fill="url(#grid)"/>}
+      {project.references.filter(x=>x.visible&&visibleLayers.has(x.layerId)).map(item=>{const d=offset('reference',item.id);return <g key={item.id} data-kind="reference" data-id={item.id} transform={`translate(${d.x} ${d.y}) rotate(${item.rotation} ${item.x+item.width/2} ${item.y+item.height/2})`}><image href={item.dataUrl} x={item.x} y={item.y} width={item.width} height={item.height} opacity={item.opacity} preserveAspectRatio="none"/>{selected.has(`reference:${item.id}`)&&<><rect className="selection-box" x={item.x} y={item.y} width={item.width} height={item.height}/>{handles(item).filter(([h])=>h.length===2).map(([h,x,y])=><circle key={h} data-kind="reference-handle" data-id={item.id} data-handle={h} className="resize-handle" cx={x} cy={y} r={8/camera.zoom}/>)}</>}</g>})}
+      {project.areas.filter(x=>visibleLayers.has(x.layerId)).map(item=><g key={item.id} data-kind="area" data-id={item.id}><rect x={item.x} y={item.y} width={item.width} height={item.height} rx={item.radius} fill={item.fill} fillOpacity={item.fillOpacity} stroke={item.stroke} strokeWidth={item.strokeWidth}/>{selected.has(`area:${item.id}`)&&<><rect className="selection-box" x={item.x} y={item.y} width={item.width} height={item.height}/>{handles(item).map(([h,x,y])=><circle key={h} data-kind="area-handle" data-id={item.id} data-handle={h} className={`resize-handle handle-${h}`} cx={x} cy={y} r={8/camera.zoom}/>)}</>}</g>)}
+      {project.areas.length?project.areas.filter(a=>a.axisY).flatMap(area=>axisTicks.y.map(t=>{const ratio=(t.position-60)/Math.max(1,project.board.height-120),y=area.y+area.padding.top+ratio*Math.max(1,area.height-area.padding.top-area.padding.bottom);return <g key={`y-${area.id}-${t.label}-${t.position}`}><line x1={area.x+area.padding.left} x2={area.x+area.width-area.padding.right} y1={y} y2={y} className={`axis-line ${t.major?'major':''}`}/><text x={area.x+(6/camera.zoom)} y={y-6/camera.zoom} className="axis-label" fontSize={11/camera.zoom}>{t.label}</text></g>})):axisTicks.y.map(t=><g key={`y-${t.label}-${t.position}`}><line x1="0" x2={project.board.width} y1={t.position} y2={t.position} className={`axis-line ${t.major?'major':''}`}/><text x={14/camera.zoom} y={t.position-6/camera.zoom} className="axis-label" fontSize={11/camera.zoom}>{t.label}</text></g>)}
+      {project.areas.length?project.areas.filter(a=>a.axisX).flatMap(area=>axisTicks.x.map(t=>{const ratio=(t.position-60)/Math.max(1,project.board.width-120),x=area.x+area.padding.left+ratio*Math.max(1,area.width-area.padding.left-area.padding.right);return <g key={`x-${area.id}-${t.label}-${t.position}`}><line x1={x} x2={x} y1={area.y+area.padding.top} y2={area.y+area.height-area.padding.bottom} className={`axis-line ${t.major?'major':''}`}/><text x={x+6/camera.zoom} y={area.y+14/camera.zoom} className="axis-label" fontSize={11/camera.zoom}>{t.label}</text></g>})):axisTicks.x.map(t=><g key={`x-${t.label}-${t.position}`}><line x1={t.position} x2={t.position} y1="0" y2={project.board.height} className={`axis-line ${t.major?'major':''}`}/><text x={t.position+6/camera.zoom} y={16/camera.zoom} className="axis-label" fontSize={11/camera.zoom}>{t.label}</text></g>)}
+      {project.nodes.filter(x=>visibleLayers.has(x.layerId)).map(node=>{const segment=durationSegment(node,project);return segment?<line key={`duration-${node.id}`} x1={segment.x} x2={segment.x} y1={segment.y1} y2={segment.y2} stroke={node.fill} strokeWidth={segment.width} opacity={node.opacity*.75} strokeLinecap="round"/>:null})}
+      {project.edges.filter(x=>visibleLayers.has(x.layerId)).map(edge=>{const source=nodeMap.get(edge.sourceId),target=nodeMap.get(edge.targetId);if(!source||!target)return null;const path=edgePath(edge,source,target,project);return <g key={edge.id} data-kind="edge" data-id={edge.id} className={selected.has(`edge:${edge.id}`)?'selected-object':''}><path d={path} fill="none" stroke={edge.colors.length>1?`url(#gradient-${edge.id})`:edge.color} strokeWidth={edge.width} strokeDasharray={edge.dash} opacity={edge.opacity} markerEnd={edge.directed?'url(#arrow)':undefined} className="edge-path"/><path d={path} fill="none" stroke="transparent" strokeWidth={Math.max(16,edge.width+10)} className="edge-hit"/>{selected.has(`edge:${edge.id}`)&&edge.waypoints.map((p,i)=><circle key={i} cx={p.x} cy={p.y} r={7/camera.zoom} className="waypoint-handle"/>)}</g>})}
+      {project.events.filter(x=>visibleLayers.has(x.layerId)).map(item=>{const d=offset('event',item.id),segments=eventSegments(item,project),first=segments[0];return <g key={item.id} data-kind="event" data-id={item.id} transform={`translate(${d.x} ${d.y})`} className={selected.has(`event:${item.id}`)?'selected-object':''}>{segments.map((segment,index)=><g key={index}><line x1={segment.x1} x2={segment.x2} y1={segment.y} y2={segment.y} stroke={item.color} strokeWidth={item.lineWidth} strokeDasharray={item.dash}/><path d={`M ${segment.x1} ${segment.y} L ${segment.x2} ${segment.y}`} stroke="transparent" strokeWidth="20"/></g>)}<text x={first.x1} y={first.y-11} fill={item.color} className="event-title">{item.title}</text></g>})}
+      {project.nodes.filter(x=>visibleLayers.has(x.layerId)).map(node=>{const d=offset('node',node.id),rect=resolvedNodeRect(node,project),x=rect.x+d.x,y=rect.y+d.y,cx=x+node.width/2,cy=y+node.height/2,r=Math.min(node.width,node.height)/2,iconSize=Math.min(node.width,node.height)*(node.containerVisible?.58:.9)*node.iconScale;return <g key={node.id} data-kind="node" data-id={node.id} className={`node-object ${selected.has(`node:${node.id}`)?'selected-object':''}`} opacity={node.opacity} transform={`rotate(${node.rotation} ${cx} ${cy})`}>
+        {node.containerVisible&&(node.shape==='sphere'?<><circle cx={cx} cy={cy} r={r} fill={node.fill} stroke={node.stroke} strokeWidth={node.strokeWidth}/><circle cx={cx-r*.28} cy={cy-r*.28} r={r*.28} fill="#fff" opacity=".22" pointerEvents="none"/></>:node.shape==='circle'?<circle cx={cx} cy={cy} r={r} fill={node.fill} stroke={node.stroke} strokeWidth={node.strokeWidth}/>:node.shape==='diamond'?<path d={`M ${cx} ${y} L ${x+node.width} ${cy} L ${cx} ${y+node.height} L ${x} ${cy} Z`} fill={node.fill} stroke={node.stroke} strokeWidth={node.strokeWidth}/>:<rect x={x} y={y} width={node.width} height={node.height} rx={node.shape==='pill'?node.height/2:node.shape==='rounded'?14:0} fill={node.fill} stroke={node.stroke} strokeWidth={node.strokeWidth}/>)}
+        {node.iconDataUrl&&<><rect x={cx-iconSize/2-3} y={cy-iconSize/2-3} width={iconSize+6} height={iconSize+6} rx={node.containerVisible?Math.min(20,iconSize/2):0} fill={node.iconBackground||'transparent'}/><image href={node.iconDataUrl} x={cx-iconSize/2} y={cy-iconSize/2} width={iconSize} height={iconSize} preserveAspectRatio="xMidYMid meet" style={{filter:node.iconInvert?'invert(1)':undefined}}/></>}
+        <text x={cx} y={y+node.height+21} textAnchor="middle" className="node-title">{node.title}</text>{node.subtitle&&<text x={cx} y={y+node.height+39} textAnchor="middle" className="node-subtitle">{node.subtitle}</text>}{node.visibleValue&&<text x={cx} y={y+node.height+55} textAnchor="middle" className="node-value">{node.visibleValue}</text>}{relationSourceId===node.id&&<circle cx={cx} cy={cy} r={r+12} className="relation-source"/>}
+      </g>})}
+      {project.texts.filter(x=>visibleLayers.has(x.layerId)).map(item=>{const d=offset('text',item.id);return <text key={item.id} data-kind="text" data-id={item.id} x={item.x+d.x} y={item.y+d.y} textAnchor={item.align} fill={item.color} fontSize={item.fontSize} fontWeight={item.fontWeight} className={selected.has(`text:${item.id}`)?'selected-text':''}>{item.text}</text>})}
+      {pointer?.mode==='marquee'&&<rect className="marquee" x={Math.min(pointer.start.x,pointer.current.x)} y={Math.min(pointer.start.y,pointer.current.y)} width={Math.abs(pointer.current.x-pointer.start.x)} height={Math.abs(pointer.current.y-pointer.start.y)}/>} 
+    </g></svg><div className="canvas-status"><span>{Math.round(camera.zoom*100)}%</span><span>{project.nodes.length} entidades · {project.edges.length} conexiones · {project.events.length} acontecimientos</span></div></main>;
 }

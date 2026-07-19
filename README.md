@@ -17,11 +17,17 @@ No existe un servidor obligatorio. La aplicación completa puede ejecutarse desd
 
 - Lienzo completamente vacío, sin áreas, columnas ni fechas obligatorias.
 - Zoom, desplazamiento, cuadrícula, ajuste y selección múltiple por recuadro.
-- Entidades con título, subtítulo y valor visible, geometría, iconos y ficha interactiva.
-- Conexiones dirigidas rectas, ortogonales o curvas, con grosor, patrón y gradiente.
-- Acontecimientos, textos, áreas opcionales, referencias y fondos múltiples.
+- Entidades con título, subtítulo y valor visible, ficha editorial completa, iconos y contenedor ocultable para que el SVG sustituya a la figura.
+- Colocación libre o semántica mediante área, valor X, valor Y y correcciones manuales.
+- Duraciones tipo histograma con inicio, final —vacío equivale al máximo/presente— y anchura editable.
+- Conexiones dirigidas rectas, ortogonales o curvas, con origen/destino editables, rol, fuerza, confianza, puntos de paso, grosor, patrón y degradado multicolor.
+- Acontecimientos libres o acotados a áreas y entidades concretas, textos, referencias y fondos múltiples.
 - Capas editables, bloqueables y ocultables.
-- Eje Y inexistente, numérico, cronológico o categórico.
+- Ejes X e Y independientes: inexistentes, numéricos, cronológicos o categóricos, con detalle adaptativo al zoom.
+- Áreas redimensionables con ocho tiradores, márgenes internos y captura opcional de cada eje.
+- Pan temporal con el botón central del ratón, independientemente de la herramienta activa.
+- Separación automática de entidades coincidentes sin alterar sus valores semánticos.
+- Migración directa de proyectos RELITree / Atlas Studio 4 y 5.
 - Deshacer y rehacer hasta 80 estados.
 - Catálogos de tipos y estados guardados dentro del proyecto.
 - Confirmación antes de eliminaciones desde la interfaz.
