@@ -1,7 +1,7 @@
 {
   "name": "atlas-editor",
   "private": true,
-  "version": "0.8.0-plan-b",
+  "version": "0.8.0",
   "type": "module",
   "description": "Editor vectorial portable para esquemas, mapas e infografías interactivas.",
   "engines": {

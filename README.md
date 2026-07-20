@@ -1,10 +1,10 @@
 # Atlas Editor
 
-Versión experimental: **0.8.0-plan-b** (rama `Plan-B`).
+Versión actual: **0.8.0**.
 
 Editor vectorial y portable para construir esquemas, lienzos, infografías, mapas, cronologías y redes interactivas. Es un producto independiente de ReliTree y puede servir como herramienta de autor para cualquier proyecto web.
 
-La rama Plan-B incorpora un laboratorio persistente de 16 módulos: componentes y estilos, auto-layout, grupos, vector, datos, biblioteca, guías, grafos y puertos, ontologías, texto enriquecido, fuentes, automatización, mapas y plantillas, interacciones, presentaciones, versiones y diagnóstico de salud. Se abre con el botón **Potencia**.
+Atlas Editor incorpora un laboratorio persistente de 16 módulos: componentes y estilos, auto-layout, grupos, vector, datos, biblioteca, guías, grafos y puertos, ontologías, texto enriquecido, fuentes, automatización, mapas y plantillas, interacciones, presentaciones, versiones y diagnóstico de salud. Se abre con el botón **Potencia**.
 
 ## Arquitectura
 

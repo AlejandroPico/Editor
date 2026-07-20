@@ -47,7 +47,7 @@ export function Topbar({ onSettings, onDatabase, onPowerTools, inspectorOpen, on
       <button title="Generar visor web interactivo listo para publicar" onClick={() => execute('Generando visor…', async () => downloadBlob(await createViewerArchive(project), `${name}-web.zip`))}><FileArchive size={17}/><span>Visor web</span></button>
       <a className="top-link" href="./downloads/Atlas-Editor-offline.html" download title="Descargar toda la aplicación en un solo HTML"><Download size={17}/><span>Editor offline</span></a>
     </div>
-    <button title="Abrir laboratorio Plan-B" onClick={onPowerTools}><Beaker size={17}/><span>Potencia</span></button>
+    <button title="Abrir laboratorio de potencia" onClick={onPowerTools}><Beaker size={17}/><span>Potencia</span></button>
     <button title={inspectorOpen?'Ocultar inspector (Mayús+I)':'Mostrar inspector (Mayús+I)'} onClick={onToggleInspector}>{inspectorOpen?<PanelRightClose size={17}/>:<PanelRightOpen size={17}/>}<span>Inspector</span></button>
     <button className="settings-button" onClick={onSettings}><Settings2 size={17}/><span>Proyecto</span></button>
     {busy && <div className="busy">{busy}</div>}
