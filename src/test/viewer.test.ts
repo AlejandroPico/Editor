@@ -12,5 +12,6 @@ describe('visor portable', () => {
     expect(html).toContain('id="rulers"');
     expect(html).toContain('function renderRulers()');
     expect(html).toContain('parentAreaId');
+    expect(html).toContain('function chapterBands(');
   });
 });

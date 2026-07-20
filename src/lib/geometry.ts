@@ -3,6 +3,7 @@ import type { Area, AtlasProject, AxisDefinition, EdgeEntity, EventEntity, NodeE
 export interface Rect { x:number; y:number; width:number; height:number }
 export interface AxisContext { axis:AxisDefinition; start:number; length:number }
 export interface AxisBand { id:string; label:string; start:number; length:number; color:string; opacity:number }
+export interface AxisChapterBand { id:string; label:string; start:number; length:number; depth:number; color:string; opacity:number; labelColor:string }
 export const snap=(value:number,step:number)=>Math.round(value/Math.max(1,step))*Math.max(1,step);
 
 export function areaContentRect(area:Area|undefined,project:AtlasProject):Rect{
@@ -49,6 +50,13 @@ export function axisBands(axis:AxisDefinition,start:number,length:number):AxisBa
     :axis.segments.map(item=>({id:item.id,label:`${item.from} – ${item.to}`,weight:item.weight,color:item.color??'transparent',opacity:item.opacity??0}));
   const total=items.reduce((sum,item)=>sum+Math.max(.01,item.weight),0);let cursor=0;
   return items.map(item=>{const a=cursor/Math.max(.01,total),b=(cursor+=Math.max(.01,item.weight))/Math.max(.01,total),from=axis.reverse?1-b:a,to=axis.reverse?1-a:b;return{id:item.id,label:item.label,start:start+from*length,length:(to-from)*length,color:item.color,opacity:item.opacity}});
+}
+
+export function axisChapterBands(axis:AxisDefinition,start:number,length:number):AxisChapterBand[]{
+  const chapters=axis.chapters??[],byId=new Map(chapters.map(item=>[item.id,item]));
+  const depthOf=(id:string)=>{let depth=0,current=byId.get(id),guard=0;const seen=new Set<string>();while(current?.parentId&&guard++<chapters.length&&!seen.has(current.parentId)){seen.add(current.parentId);const parent=byId.get(current.parentId);if(!parent)break;depth+=1;current=parent}return depth};
+  const categorySpan=(from:number|string,to:number|string):[number,number]|null=>{const indexFor=(value:number|string)=>axis.categories.findIndex(item=>item.id===String(value)||item.label===String(value)),a=indexFor(from),b=indexFor(to);if(a<0||b<0)return null;const low=Math.min(a,b),high=Math.max(a,b),total=axis.categories.reduce((sum,item)=>sum+Math.max(.01,item.weight),0),before=axis.categories.slice(0,low).reduce((sum,item)=>sum+Math.max(.01,item.weight),0),through=axis.categories.slice(0,high+1).reduce((sum,item)=>sum+Math.max(.01,item.weight),0),r1=before/Math.max(.01,total),r2=through/Math.max(.01,total),p1=start+(axis.reverse?1-r2:r1)*length,p2=start+(axis.reverse?1-r1:r2)*length;return[Math.min(p1,p2),Math.max(p1,p2)]};
+  return chapters.flatMap(chapter=>{const categorical=axis.mode==='categories'?categorySpan(chapter.from,chapter.to):null,a=categorical?.[0]??axisValuePosition(axis,chapter.from,start,length),b=categorical?.[1]??axisValuePosition(axis,chapter.to,start,length);if(a==null||b==null)return[];return[{id:chapter.id,label:chapter.label,start:Math.min(a,b),length:Math.max(1,Math.abs(b-a)),depth:depthOf(chapter.id),color:chapter.color,opacity:chapter.opacity,labelColor:chapter.labelColor}]});
 }
 
 function rawNodeRect(node:NodeEntity,project?:AtlasProject):Rect{
