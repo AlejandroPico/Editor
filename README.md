@@ -1,6 +1,6 @@
 # Atlas Editor
 
-Versión actual: **0.5.0**.
+Versión actual: **0.6.0**.
 
 Editor vectorial y portable para construir esquemas, lienzos, infografías, mapas, cronologías y redes interactivas. Es un producto independiente de ReliTree y puede servir como herramienta de autor para cualquier proyecto web.
 
@@ -26,6 +26,8 @@ No existe un servidor obligatorio. La aplicación completa puede ejecutarse desd
 - Acontecimientos libres o acotados a áreas y entidades concretas, textos, referencias y fondos múltiples.
 - Capas editables, bloqueables y ocultables.
 - Ejes X e Y generales independientes: inexistentes, numéricos, cronológicos o categóricos, con detalle adaptativo al zoom.
+- Capítulos y subcapítulos ilimitados dentro de cada eje: intervalos jerárquicos coloreables que funcionan como encabezados fijos de una hoja de cálculo (eón → era → período → época, por ejemplo).
+- Los ejes propios de área también admiten subejes jerárquicos y el visor web conserva exactamente la navegación fija.
 - Reglas X/Y permanentes y desactivables: permanecen pegadas al borde de la pantalla, reducen automáticamente valores solapados y permiten configurar tamaño y separación mínima.
 - Categorías libres, reordenables, con tamaño relativo y banda de fondo coloreable/transparente en ambos ejes.
 - Escalas numéricas por tramos: cada intervalo puede tener su propio paso, proporción visual, color y opacidad para comprimir periodos dispersos y ampliar los densos.
@@ -74,3 +76,5 @@ La validación completa se ejecuta con `npm run validate`: comprueba TypeScript,
 ## Publicación
 
 La acción `.github/workflows/pages.yml` valida y publica automáticamente `main` en <https://alejandropico.github.io/Editor/>. También conserva la versión portable como artefacto descargable de GitHub Actions.
+
+Las ampliaciones candidatas y su prioridad están recogidas en [ROADMAP.md](ROADMAP.md).
