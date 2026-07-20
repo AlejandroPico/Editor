@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
-import { Box, Database, Download, FileArchive, FileDown, FilePlus2, FolderOpen, PanelRightClose, PanelRightOpen, Redo2, Save, Settings2, Undo2 } from 'lucide-react';
+import { Beaker, Box, Database, Download, FileArchive, FileDown, FilePlus2, FolderOpen, PanelRightClose, PanelRightOpen, Redo2, Save, Settings2, Undo2 } from 'lucide-react';
 import { useEditorStore } from '../store/editorStore';
 import { createProjectArchive, createViewerArchive, openProjectFile } from '../lib/archive';
 import { downloadBlob, downloadText, safeFileName } from '../lib/download';
 import { projectFromDatabase } from '../lib/sqlite';
 import { projectSvg } from '../lib/svgExport';
 
-export function Topbar({ onSettings, onDatabase, inspectorOpen, onToggleInspector }: { onSettings: () => void; onDatabase: () => void; inspectorOpen: boolean; onToggleInspector: () => void }): React.JSX.Element {
+export function Topbar({ onSettings, onDatabase, onPowerTools, inspectorOpen, onToggleInspector }: { onSettings: () => void; onDatabase: () => void; onPowerTools: () => void; inspectorOpen: boolean; onToggleInspector: () => void }): React.JSX.Element {
   const input = useRef<HTMLInputElement>(null);
   const project = useEditorStore(state => state.project);
   const dirty = useEditorStore(state => state.dirty);
@@ -47,6 +47,7 @@ export function Topbar({ onSettings, onDatabase, inspectorOpen, onToggleInspecto
       <button title="Generar visor web interactivo listo para publicar" onClick={() => execute('Generando visor…', async () => downloadBlob(await createViewerArchive(project), `${name}-web.zip`))}><FileArchive size={17}/><span>Visor web</span></button>
       <a className="top-link" href="./downloads/Atlas-Editor-offline.html" download title="Descargar toda la aplicación en un solo HTML"><Download size={17}/><span>Editor offline</span></a>
     </div>
+    <button title="Abrir laboratorio Plan-B" onClick={onPowerTools}><Beaker size={17}/><span>Potencia</span></button>
     <button title={inspectorOpen?'Ocultar inspector (Mayús+I)':'Mostrar inspector (Mayús+I)'} onClick={onToggleInspector}>{inspectorOpen?<PanelRightClose size={17}/>:<PanelRightOpen size={17}/>}<span>Inspector</span></button>
     <button className="settings-button" onClick={onSettings}><Settings2 size={17}/><span>Proyecto</span></button>
     {busy && <div className="busy">{busy}</div>}

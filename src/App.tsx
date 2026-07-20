@@ -5,12 +5,14 @@ import { ProjectDialog } from './components/ProjectDialog';
 import { DatabaseDialog } from './components/DatabaseDialog';
 import { Toolbox } from './components/Toolbox';
 import { Topbar } from './components/Topbar';
+import { PowerToolsDialog } from './components/PowerToolsDialog';
 import { useEditorStore } from './store/editorStore';
 import type { Tool } from './model/project';
 
 export function App(): React.JSX.Element {
   const [settings, setSettings] = useState(false);
   const [database, setDatabase] = useState(false);
+  const [powerTools, setPowerTools] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(true);
   const project = useEditorStore(state => state.project);
   const setTool = useEditorStore(state => state.setTool);
@@ -42,12 +44,13 @@ export function App(): React.JSX.Element {
     window.addEventListener('beforeunload', beforeUnload); return () => window.removeEventListener('beforeunload', beforeUnload);
   }, []);
   return <div className={`app ${inspectorOpen ? '' : 'inspector-hidden'}`}>
-    <Topbar onSettings={() => setSettings(true)} onDatabase={() => setDatabase(true)} inspectorOpen={inspectorOpen} onToggleInspector={() => setInspectorOpen(value => !value)}/>
+    <Topbar onSettings={() => setSettings(true)} onDatabase={() => setDatabase(true)} onPowerTools={() => setPowerTools(true)} inspectorOpen={inspectorOpen} onToggleInspector={() => setInspectorOpen(value => !value)}/>
     <Toolbox/>
     <Canvas/>
     {inspectorOpen && <Inspector/>}
     <footer className="statusbar"><span>Formato {project.format} v{project.version}</span><span>Supr: eliminar · Ctrl+Z/Y: historial · Mayús+I: inspector · rueda: zoom</span><span>{project.board.width} × {project.board.height}</span></footer>
     {settings && <ProjectDialog onClose={() => setSettings(false)}/>} 
     {database && <DatabaseDialog onClose={() => setDatabase(false)}/>} 
+    {powerTools && <PowerToolsDialog onClose={() => setPowerTools(false)}/>} 
   </div>;
 }
