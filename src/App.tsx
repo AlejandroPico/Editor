@@ -11,6 +11,7 @@ import type { Tool } from './model/project';
 export function App(): React.JSX.Element {
   const [settings, setSettings] = useState(false);
   const [database, setDatabase] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
   const project = useEditorStore(state => state.project);
   const setTool = useEditorStore(state => state.setTool);
   const undo = useEditorStore(state => state.undo);
@@ -23,6 +24,7 @@ export function App(): React.JSX.Element {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); event.shiftKey ? redo() : undo(); return; }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'y') { event.preventDefault(); redo(); return; }
       if (editing) return;
+      if (event.shiftKey && event.key.toLowerCase() === 'i') { event.preventDefault(); setInspectorOpen(value => !value); return; }
       if (event.key === 'Delete' || event.key === 'Backspace') {
         event.preventDefault();
         if (selection.length && confirm(`¿Eliminar ${selection.length === 1 ? 'el objeto seleccionado' : `${selection.length} objetos seleccionados`}?`)) deleteSelection();
@@ -39,12 +41,12 @@ export function App(): React.JSX.Element {
     const beforeUnload = (event: BeforeUnloadEvent) => { if (useEditorStore.getState().dirty) event.preventDefault(); };
     window.addEventListener('beforeunload', beforeUnload); return () => window.removeEventListener('beforeunload', beforeUnload);
   }, []);
-  return <div className="app">
-    <Topbar onSettings={() => setSettings(true)} onDatabase={() => setDatabase(true)}/>
+  return <div className={`app ${inspectorOpen ? '' : 'inspector-hidden'}`}>
+    <Topbar onSettings={() => setSettings(true)} onDatabase={() => setDatabase(true)} inspectorOpen={inspectorOpen} onToggleInspector={() => setInspectorOpen(value => !value)}/>
     <Toolbox/>
     <Canvas/>
-    <Inspector/>
-    <footer className="statusbar"><span>Formato {project.format} v{project.version}</span><span>Supr: eliminar · Ctrl+Z/Y: historial · rueda: zoom</span><span>{project.board.width} × {project.board.height}</span></footer>
+    {inspectorOpen && <Inspector/>}
+    <footer className="statusbar"><span>Formato {project.format} v{project.version}</span><span>Supr: eliminar · Ctrl+Z/Y: historial · Mayús+I: inspector · rueda: zoom</span><span>{project.board.width} × {project.board.height}</span></footer>
     {settings && <ProjectDialog onClose={() => setSettings(false)}/>} 
     {database && <DatabaseDialog onClose={() => setDatabase(false)}/>} 
   </div>;

@@ -90,14 +90,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const id = uid('event');
     get().updateProject('Añadir acontecimiento', draft => draft.events.push({
       id, title: 'Nuevo acontecimiento', subtitle: '', x: point.x - 80, y: point.y, width: 160,
-      color: '#d97706', lineWidth: 3, dash: '8 6', layerId: draft.activeLayerId,
-      kind: draft.catalogs.eventKinds[0]?.id ?? 'milestone', summary: '', scope: 'free', areaIds: [], entityIds: [], axisValue: null, endValue: null
+      color: '#d97706', lineWidth: 3, dash: '8 6', opacity:1,lineCap:'round',startMarker:'none',endMarker:'none',layerId: draft.activeLayerId,
+      kind: draft.catalogs.eventKinds[0]?.id ?? 'milestone', summary: '', scope: 'free', areaIds: [], entityIds: [],axisIds:[],bandIds:[], axisValue: null, endValue: null
     }));
     set({ selection: [{ type: 'event', id }], tool: 'select' });
   },
   addText: point => {
     const id = uid('text');
-    get().updateProject('Añadir texto', draft => draft.texts.push({ id, text: 'Texto', x: point.x, y: point.y, fontSize: 28, fontWeight: 600, color: '#0f172a', align: 'start', layerId: draft.activeLayerId }));
+    get().updateProject('Añadir texto', draft => draft.texts.push({ id, text: 'Texto', x: point.x, y: point.y, fontSize: 28, fontWeight: 600, color: '#0f172a',opacity:1,rotation:0, align: 'start',links:[],anchorTarget:null,anchorValue:null,offsetX:0,offsetY:0,layerId: draft.activeLayerId }));
     set({ selection: [{ type: 'text', id }], tool: 'select' });
   },
   relationClick: nodeId => {
@@ -130,7 +130,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         item.x = absolute ? absolute.x - item.width / 2 : item.x + dx; item.y = absolute ? absolute.y : item.y + dy;
       } else if (selected.type === 'text') {
         const item = draft.texts.find(text => text.id === selected.id); if (!item) continue;
-        item.x = absolute ? absolute.x : item.x + dx; item.y = absolute ? absolute.y : item.y + dy;
+        if(item.anchorTarget){item.offsetX+=dx;item.offsetY+=dy}else{item.x = absolute ? absolute.x : item.x + dx; item.y = absolute ? absolute.y : item.y + dy;}
       } else if (selected.type === 'reference') {
         const item = draft.references.find(reference => reference.id === selected.id); if (!item) continue;
         item.x = absolute ? absolute.x - item.width / 2 : item.x + dx; item.y = absolute ? absolute.y - item.height / 2 : item.y + dy;

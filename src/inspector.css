@@ -1,3 +1,4 @@
+.app.inspector-hidden { --right: 0px; }
 .axis-line { stroke-opacity: .12; }
 .axis-line.major { stroke-opacity: .34; stroke-width: 1.4; }
 .resize-handle, .waypoint-handle { fill: #fff; stroke: #2563eb; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: nwse-resize; }

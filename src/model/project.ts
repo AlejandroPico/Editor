@@ -1,5 +1,5 @@
 export const PROJECT_FORMAT = 'atlas-editor-project';
-export const PROJECT_VERSION = 6;
+export const PROJECT_VERSION = 7;
 
 export type Id = string;
 export type AxisMode = 'none' | 'timeline' | 'numeric' | 'categories';
@@ -160,17 +160,40 @@ export interface EventEntity {
   color: string;
   lineWidth: number;
   dash: string;
+  opacity: number;
+  lineCap: 'butt' | 'round' | 'square';
+  startMarker: EdgeMarker;
+  endMarker: EdgeMarker;
   layerId: Id;
   kind: string;
   summary: string;
-  scope: 'free' | 'areas' | 'entities' | 'mixed';
+  scope: 'free' | 'axes' | 'areas' | 'entities' | 'mixed';
   areaIds: Id[];
   entityIds: Id[];
+  axisIds: string[];
+  bandIds: string[];
   axisValue: number | string | null;
   endValue: number | string | null;
 }
 
-export interface TextEntity { id: Id; text: string; x: number; y: number; fontSize: number; fontWeight: number; color: string; align: 'start' | 'middle' | 'end'; layerId: Id }
+export interface TextEntity {
+  id: Id;
+  text: string;
+  x: number;
+  y: number;
+  fontSize: number;
+  fontWeight: number;
+  color: string;
+  opacity: number;
+  rotation: number;
+  align: 'start' | 'middle' | 'end';
+  links: string[];
+  anchorTarget: string | null;
+  anchorValue: number | string | null;
+  offsetX: number;
+  offsetY: number;
+  layerId: Id;
+}
 
 export interface ReferenceImage {
   id: Id;
@@ -315,7 +338,7 @@ function migrateReliTree(value: LegacyObject): AtlasProject {
   };
   for (const relation of atlas.relations ?? []) addRelation(relation, uid('edge'));
   for (const item of traditions) if (item.parentId) addRelation({ sourceId: item.parentId, targetId: item.id, kind: item.relationToParent ?? 'derivation', role: 'primary', confidence: item.confidence }, `parent-${item.parentId}-${item.id}`);
-  const events: EventEntity[] = (atlas.events ?? []).map((item: LegacyObject) => { const visual=item.visual??{}, scope=item.scope==='regions'?'areas':item.scope; return { id:String(item.id), title:String(item.title??item.id), subtitle:String(item.subtitle??''), x:finite(item.placement?.absoluteX,margin), y:item.year!=null?yFor(finite(item.year,present)):finite(item.placement?.absoluteY,300), width:finite(visual.width,320), color:visual.color??'#d97706', lineWidth:finite(visual.lineWidth,2), dash:String(visual.lineDash??'8 6'), layerId:blank.activeLayerId, kind:String(item.kind??'milestone'), summary:String(item.summary??''), scope:['free','areas','entities','mixed'].includes(scope)?scope:'free', areaIds:[...(item.regionIds??[])].map(String), entityIds:[...(item.entityIds??[])].map(String), axisValue:item.year??null, endValue:item.endYear??null }; });
+  const events: EventEntity[] = (atlas.events ?? []).map((item: LegacyObject) => { const visual=item.visual??{}, scope=item.scope==='regions'?'areas':item.scope; return { id:String(item.id), title:String(item.title??item.id), subtitle:String(item.subtitle??''), x:finite(item.placement?.absoluteX,margin), y:item.year!=null?yFor(finite(item.year,present)):finite(item.placement?.absoluteY,300), width:finite(visual.width,320), color:visual.color??'#d97706', lineWidth:finite(visual.lineWidth,2), dash:String(visual.lineDash??'8 6'), opacity:finite(visual.opacity,1),lineCap:'round',startMarker:'none',endMarker:'none',layerId:blank.activeLayerId, kind:String(item.kind??'milestone'), summary:String(item.summary??''), scope:['free','axes','areas','entities','mixed'].includes(scope)?scope:'free', areaIds:[...(item.regionIds??[])].map(String), entityIds:[...(item.entityIds??[])].map(String),axisIds:[],bandIds:[], axisValue:item.year??null, endValue:item.endYear??null }; });
   const references: ReferenceImage[] = (value.editor?.references ?? []).filter((item: LegacyObject) => item.embeddedDataUrl).map((item: LegacyObject, index: number) => ({ id:String(item.id??`reference-${index+1}`), name:String(item.name??`Referencia ${index+1}`), role:item.role==='background'?'background':'reference', dataUrl:String(item.embeddedDataUrl), x:finite(item.x,120), y:finite(item.y,120), width:finite(item.width,1200), height:finite(item.height,800), rotation:finite(item.rotation,0), opacity:finite(item.opacity,.3), visible:item.visible!==false, locked:false, lockAspect:item.lockAspect!==false, layerId:blank.activeLayerId }));
   return { ...blank, id: String(meta.id ?? blank.id), title: String(meta.board?.title ?? 'Proyecto RELITree importado'), description: String(meta.referenceNotice ?? ''), createdAt: String(meta.generatedAt ?? blank.createdAt), updatedAt: new Date().toISOString(), board: { ...blank.board, width, height, background: meta.board?.backgroundColor ?? blank.board.background, backgroundOpacity: finite(meta.board?.backgroundOpacity, 1), gridVisible: meta.board?.gridVisible !== false, gridColor: meta.board?.gridColor ?? blank.board.gridColor, gridOpacity: finite(meta.board?.gridOpacity, .08), axes: { x: { ...defaultAxis(false), mode: 'numeric', min: 0, max: 100, step: 10, visible: false, label: 'Posición dentro del área (%)' }, y: { ...defaultAxis(true), mode: meta.board?.axisMode === 'none' ? 'none' : 'timeline', min, max: present, step: Math.max(1, finite(value.editor?.canvas?.gridSize, 100)), visible: meta.board?.axisMode !== 'none', label: 'Año' } } }, areas, nodes, edges, events, references, catalogs: { ...blank.catalogs, nodeTypes: mergeCatalog(blank.catalogs.nodeTypes, value.catalogs?.entityKinds), statuses: mergeCatalog(blank.catalogs.statuses, value.catalogs?.statuses), edgeKinds: mergeCatalog(blank.catalogs.edgeKinds, value.catalogs?.relationKinds), edgeRoles: mergeCatalog(blank.catalogs.edgeRoles, value.catalogs?.relationRoles), confidences: mergeCatalog(blank.catalogs.confidences, value.catalogs?.confidences), eventKinds: mergeCatalog(blank.catalogs.eventKinds, value.catalogs?.eventKinds) }, metadata: { importedFrom: `Atlas Studio ${value.schemaVersion ?? 'legacy'}`, importedAt: new Date().toISOString(), legacySavedAt: String(value.savedAt ?? '') } };
 }
@@ -338,8 +361,9 @@ export function normalizeProject(input: unknown): AtlasProject {
   const areas = (raw.areas ?? []).map((area: LegacyObject) => ({ ...area, parentAreaId:area.parentAreaId??null, showTitle:area.showTitle!==false, titleColor:String(area.titleColor??area.stroke??'#334155'), titleSize:Math.max(6,finite(area.titleSize,16)), padding: { top: 28, right: 28, bottom: 28, left: 28, ...(area.padding ?? {}) }, axisBindings:{x:{...defaultBinding(area.axisX===false?'none':'local-project'),...(area.axisBindings?.x??{}),axis:normalizeAxis(area.axisBindings?.x?.axis,blank.board.axes.x)},y:{...defaultBinding(area.axisY===false?'none':'project',true),...(area.axisBindings?.y??{}),axis:normalizeAxis(area.axisBindings?.y?.axis,blank.board.axes.y)}} }));
   const nodes = (raw.nodes ?? []).map((node: LegacyObject) => ({ ...node, shape: node.shape ?? 'rounded', iconScale: finite(node.iconScale, 1), containerVisible: node.containerVisible !== false, details: { ...defaultDetails(), ...(node.details ?? {}) }, customFields: node.customFields ?? {}, tags: node.tags ?? [], areaIds: node.areaIds ?? [], placement: { ...defaultPlacement(), ...(node.placement ?? {}) } }));
   const edges = (raw.edges ?? []).map((edge: LegacyObject) => ({ role:'secondary',strength:60,confidence:'medium',note:'',startMarker:'none',endMarker:edge.directed===false?'none':'arrow',lineCap:'round',avoidOverlap:true,parallelOffset:0,...edge,colors:edge.colors??[],waypoints:edge.waypoints??[] }));
-  const events = (raw.events ?? []).map((event: LegacyObject) => ({ scope:'free',areaIds:[],entityIds:[],axisValue:null,endValue:null,...event }));
+  const events = (raw.events ?? []).map((event: LegacyObject) => ({ scope:'free',areaIds:[],entityIds:[],axisIds:[],bandIds:[],axisValue:null,endValue:null,opacity:1,lineCap:'round',startMarker:'none',endMarker:'none',...event }));
+  const texts = (raw.texts ?? []).map((text:LegacyObject)=>({opacity:1,rotation:0,links:[],anchorTarget:null,anchorValue:null,offsetX:0,offsetY:0,...text}));
   const incomingSchema=raw.entitySchema??{};
   const entitySchema:EntitySchema={sections:Array.isArray(incomingSchema.sections)&&incomingSchema.sections.length?incomingSchema.sections.map((item:LegacyObject,index:number)=>({id:String(item.id??`section-${index+1}`),label:String(item.label??'Sección'),description:String(item.description??'')})):blank.entitySchema.sections,fields:Array.isArray(incomingSchema.fields)?incomingSchema.fields.map((item:LegacyObject,index:number)=>({id:String(item.id??`field-${index+1}`),label:String(item.label??'Campo'),sectionId:String(item.sectionId??blank.entitySchema.sections[0].id),type:['text','textarea','number','boolean','select','url','date'].includes(item.type)?item.type:'text',required:Boolean(item.required),options:Array.isArray(item.options)?item.options.map(String):[],help:String(item.help??'')})):[]};
-  return { ...blank, ...raw, version: PROJECT_VERSION, board, layers: raw.layers?.length ? raw.layers : blank.layers, areas, nodes, edges, events, texts: raw.texts ?? [], references: raw.references ?? [], catalogs: { ...blank.catalogs, ...(raw.catalogs ?? {}) }, entitySchema, database:{customSql:Array.isArray(raw.database?.customSql)?raw.database.customSql.map(String):[]}, metadata: raw.metadata ?? {} } as AtlasProject;
+  return { ...blank, ...raw, version: PROJECT_VERSION, board, layers: raw.layers?.length ? raw.layers : blank.layers, areas, nodes, edges, events, texts, references: raw.references ?? [], catalogs: { ...blank.catalogs, ...(raw.catalogs ?? {}) }, entitySchema, database:{customSql:Array.isArray(raw.database?.customSql)?raw.database.customSql.map(String):[]}, metadata: raw.metadata ?? {} } as AtlasProject;
 }

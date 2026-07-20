@@ -1,9 +1,10 @@
-import type { Area, AtlasProject, AxisDefinition, EdgeEntity, EventEntity, NodeEntity, Point } from '../model/project';
+import type { Area, AtlasProject, AxisDefinition, EdgeEntity, EventEntity, NodeEntity, Point, TextEntity } from '../model/project';
 
 export interface Rect { x:number; y:number; width:number; height:number }
 export interface AxisContext { axis:AxisDefinition; start:number; length:number }
 export interface AxisBand { id:string; label:string; start:number; length:number; color:string; opacity:number }
 export interface AxisChapterBand { id:string; label:string; start:number; length:number; depth:number; color:string; opacity:number; labelColor:string }
+export interface EventSegment { x1:number; y1:number; x2:number; y2:number }
 export const snap=(value:number,step:number)=>Math.round(value/Math.max(1,step))*Math.max(1,step);
 
 export function areaContentRect(area:Area|undefined,project:AtlasProject):Rect{
@@ -107,11 +108,34 @@ export function durationSegment(node:NodeEntity,project:AtlasProject):{x:number;
   const placement=node.placement,start=placement.durationStart??(typeof placement.yValue==='number'?placement.yValue:null);if(placement.mode!=='semantic'||start==null)return null;const area=project.areas.find(item=>item.id===placement.areaId),context=axisContext(project,area,'y');if(!context)return null;const end=placement.durationEnd??context.axis.max,center=nodeCenter(node,project),y1=axisValuePosition(context.axis,start,context.start,context.length),y2=axisValuePosition(context.axis,end,context.start,context.length);return y1==null||y2==null?null:{x:center.x,y1,y2,width:placement.durationWidth};
 }
 
-export function eventSegments(event:EventEntity,project:AtlasProject):Array<{x1:number;x2:number;y:number}>{
-  if(event.scope==='free')return[{x1:event.x,x2:event.x+event.width,y:event.y}];const segments:Array<{x1:number;x2:number;y:number}>=[];
-  if(event.scope==='areas'||event.scope==='mixed')for(const id of event.areaIds){const area=project.areas.find(item=>item.id===id);if(!area)continue;const rect=areaContentRect(area,project),context=axisContext(project,area,'y'),y=context?axisValuePosition(context.axis,event.axisValue,context.start,context.length):null;segments.push({x1:rect.x,x2:rect.x+rect.width,y:y??event.y})}
-  if(event.scope==='entities'||event.scope==='mixed')for(const id of event.entityIds){const node=project.nodes.find(item=>item.id===id);if(!node)continue;const center=nodeCenter(node,project),area=project.areas.find(item=>item.id===node.placement.areaId),context=axisContext(project,area,'y'),y=event.axisValue!=null&&context?axisValuePosition(context.axis,event.axisValue,context.start,context.length):center.y;segments.push({x1:center.x-event.width/2,x2:center.x+event.width/2,y:y??center.y})}
-  return segments.length?segments:[{x1:event.x,x2:event.x+event.width,y:event.y}];
+function targetAxis(project:AtlasProject,target:string):{orientation:'x'|'y';context:AxisContext;crossStart:number;crossEnd:number}|null{
+  if(target==='general:x'||target==='general:y'){const orientation=target.at(-1) as 'x'|'y',context=axisContext(project,undefined,orientation);if(!context)return null;return{orientation,context,crossStart:0,crossEnd:orientation==='x'?project.board.height:project.board.width}}
+  const match=target.match(/^area:(.+):(x|y)$/);if(!match)return null;const area=project.areas.find(item=>item.id===match[1]),orientation=match[2] as 'x'|'y';if(!area)return null;const context=axisContext(project,area,orientation),rect=areaContentRect(area,project);return context?{orientation,context,crossStart:orientation==='x'?rect.y:rect.x,crossEnd:orientation==='x'?rect.y+rect.height:rect.x+rect.width}:null;
+}
+
+function segmentAtAxis(target:ReturnType<typeof targetAxis>,value:number|string|null,fallback:Point):EventSegment|null{
+  if(!target)return null;const position=axisValuePosition(target.context.axis,value,target.context.start,target.context.length);if(position==null)return null;return target.orientation==='x'?{x1:position,y1:target.crossStart,x2:position,y2:target.crossEnd}:{x1:target.crossStart,y1:position,x2:target.crossEnd,y2:position};
+}
+
+function segmentAtBand(project:AtlasProject,target:string):EventSegment|null{
+  const match=target.match(/^general:(x|y):(category|segment|chapter):(.+)$/);if(!match)return null;const orientation=match[1] as 'x'|'y',kind=match[2],id=match[3],axis=project.board.axes[orientation],context=axisContext(project,undefined,orientation);if(!context)return null;const bands=kind==='chapter'?axisChapterBands(axis,context.start,context.length):axisBands(axis,context.start,context.length),band=bands.find(item=>item.id===id);if(!band)return null;const position=band.start+band.length/2;return orientation==='x'?{x1:position,y1:0,x2:position,y2:project.board.height}:{x1:0,y1:position,x2:project.board.width,y2:position};
+}
+
+export function eventSegments(event:EventEntity,project:AtlasProject):EventSegment[]{
+  if(event.scope==='free')return[{x1:event.x,y1:event.y,x2:event.x+event.width,y2:event.y}];const segments:EventSegment[]=[];
+  if(event.scope==='axes'||event.scope==='mixed'){for(const id of event.axisIds){const segment=segmentAtAxis(targetAxis(project,id),event.axisValue,{x:event.x,y:event.y});if(segment)segments.push(segment)}for(const id of event.bandIds){const segment=segmentAtBand(project,id);if(segment)segments.push(segment)}}
+  if(event.scope==='areas'||event.scope==='mixed')for(const id of event.areaIds){const area=project.areas.find(item=>item.id===id);if(!area)continue;const rect=areaContentRect(area,project),context=axisContext(project,area,'y'),y=context?axisValuePosition(context.axis,event.axisValue,context.start,context.length):null;segments.push({x1:rect.x,y1:y??event.y,x2:rect.x+rect.width,y2:y??event.y})}
+  if(event.scope==='entities'||event.scope==='mixed')for(const id of event.entityIds){const node=project.nodes.find(item=>item.id===id);if(!node)continue;const center=nodeCenter(node,project),area=project.areas.find(item=>item.id===node.placement.areaId),context=axisContext(project,area,'y'),y=event.axisValue!=null&&context?axisValuePosition(context.axis,event.axisValue,context.start,context.length):center.y;segments.push({x1:center.x-event.width/2,y1:y??center.y,x2:center.x+event.width/2,y2:y??center.y})}
+  return segments.length?segments:[{x1:event.x,y1:event.y,x2:event.x+event.width,y2:event.y}];
+}
+
+export function resolvedTextPoint(text:TextEntity,project:AtlasProject):Point{
+  const target=text.anchorTarget;if(!target)return{x:text.x,y:text.y};
+  if(target.startsWith('node:')){const node=project.nodes.find(item=>item.id===target.slice(5));if(node){const center=nodeCenter(node,project);return{x:center.x+text.offsetX,y:center.y+text.offsetY}}}
+  if(target.startsWith('area:')&&!target.match(/^area:.+:[xy]$/)){const area=project.areas.find(item=>item.id===target.slice(5));if(area)return{x:area.x+area.width/2+text.offsetX,y:area.y+area.height/2+text.offsetY}}
+  if(target.startsWith('general:')||target.match(/^area:.+:[xy]$/)){const axis=targetAxis(project,target);if(axis){const position=axisValuePosition(axis.context.axis,text.anchorValue,axis.context.start,axis.context.length);if(position!=null)return axis.orientation==='x'?{x:position+text.offsetX,y:axis.crossStart+text.offsetY}:{x:axis.crossStart+text.offsetX,y:position+text.offsetY}}}
+  const band=segmentAtBand(project,target);if(band)return{x:(band.x1+band.x2)/2+text.offsetX,y:(band.y1+band.y2)/2+text.offsetY};
+  return{x:text.x+text.offsetX,y:text.y+text.offsetY};
 }
 
 export function pointInRect(point:Point,start:Point,end:Point):boolean{return point.x>=Math.min(start.x,end.x)&&point.x<=Math.max(start.x,end.x)&&point.y>=Math.min(start.y,end.y)&&point.y<=Math.max(start.y,end.y)}

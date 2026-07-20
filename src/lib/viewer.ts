@@ -1,5 +1,5 @@
 import type { AtlasProject } from '../model/project';
-import { axisBands, edgePath, eventSegments, resolvedNodeRect } from './geometry';
+import { axisBands, edgePath, eventSegments, resolvedNodeRect, resolvedTextPoint } from './geometry';
 
 const html=(value:unknown)=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]!));
 
@@ -8,7 +8,8 @@ export function interactiveViewerHtml(project:AtlasProject):string{
   snapshot.nodes=snapshot.nodes.map(node=>{const rect=resolvedNodeRect(node,project);return{...node,...rect,placement:{...node.placement,mode:'free'}}});
   const sourceNodes=new Map(project.nodes.map(node=>[node.id,node]));
   const viewerEdges=snapshot.edges.map(edge=>{const source=sourceNodes.get(edge.sourceId),target=sourceNodes.get(edge.targetId);return{...edge,renderPath:source&&target?edgePath(edge,source,target,project):''}});
-  snapshot.events=snapshot.events.flatMap(event=>eventSegments(event,project).map((segment,index)=>({...event,id:`${event.id}-${index}`,x:segment.x1,y:segment.y,width:segment.x2-segment.x1,scope:'free'})));
+  snapshot.events=snapshot.events.flatMap(event=>eventSegments(event,project).map((segment,index)=>({...event,id:`${event.id}-${index}`,renderSegment:segment,scope:'free'})));
+  snapshot.texts=snapshot.texts.map(text=>{const point=resolvedTextPoint(text,project);return{...text,...point,anchorTarget:null}});
   const renderBands={x:axisBands(project.board.axes.x,60,project.board.width-120),y:axisBands(project.board.axes.y,60,project.board.height-120)};
   const json=JSON.stringify({...snapshot,edges:viewerEdges,renderBands}).replaceAll('</script','<\\/script');
   return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${html(project.title)}</title><style>

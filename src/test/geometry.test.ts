@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { axisBands, axisChapterBands, axisValueRatio, edgePath, pointInRect, resolvedNodeRect, snap } from '../lib/geometry';
+import { axisBands, axisChapterBands, axisValueRatio, edgePath, eventSegments, pointInRect, resolvedNodeRect, resolvedTextPoint, snap } from '../lib/geometry';
 import { createBlankProject } from '../model/project';
 
 describe('geometría vectorial', () => {
@@ -32,5 +32,12 @@ describe('geometría vectorial', () => {
   it('separa conexiones paralelas del mismo recorrido',()=>{
     const project=createBlankProject(),layerId=project.activeLayerId,base={title:'',subtitle:'',visibleValue:'',width:50,height:50,rotation:0,shape:'circle' as const,fill:'#fff',stroke:'#000',strokeWidth:1,opacity:1,iconScale:1,containerVisible:true,layerId,type:'entity',status:'active',summary:'',details:{},customFields:{},tags:[],areaIds:[],placement:{mode:'free' as const,areaId:null,xValue:null,yValue:null,offsetX:0,offsetY:0,avoidOverlap:true,durationStart:null,durationEnd:null,durationWidth:4}},a={...base,id:'a',x:0,y:0},b={...base,id:'b',x:300,y:0},edge={id:'e1',sourceId:'a',targetId:'b',label:'',kind:'connection',role:'primary',strength:80,confidence:'medium',note:'',route:'straight' as const,directed:true,startMarker:'none' as const,endMarker:'arrow' as const,lineCap:'round' as const,avoidOverlap:true,parallelOffset:0,color:'#000',colors:[],width:4,dash:'',opacity:1,waypoints:[],layerId};project.nodes=[a,b];project.edges=[edge,{...edge,id:'e2'}];
     expect(edgePath(project.edges[0],a,b,project)).not.toBe(edgePath(project.edges[1],a,b,project));
+  });
+  it('ancla acontecimientos a ejes generales y textos a entidades',()=>{
+    const project=createBlankProject(),layerId=project.activeLayerId;project.board.axes.y={...project.board.axes.y,mode:'timeline',visible:true,min:0,max:100};
+    const event={id:'event',title:'Hito',subtitle:'',x:10,y:10,width:100,color:'#000',lineWidth:2,dash:'',opacity:1,lineCap:'round' as const,startMarker:'none' as const,endMarker:'none' as const,layerId,kind:'event',summary:'',scope:'axes' as const,areaIds:[],entityIds:[],axisIds:['general:y'],bandIds:[],axisValue:50,endValue:null};
+    expect(eventSegments(event,project)[0]).toMatchObject({x1:0,x2:project.board.width,y1:project.board.height/2,y2:project.board.height/2});
+    const base={id:'node',title:'Nodo',subtitle:'',visibleValue:'',x:100,y:200,width:100,height:60,rotation:0,shape:'rounded' as const,fill:'#fff',stroke:'#000',strokeWidth:1,opacity:1,iconScale:1,containerVisible:true,layerId,type:'entity',status:'active',summary:'',details:{},customFields:{},tags:[],areaIds:[],placement:{mode:'free' as const,areaId:null,xValue:null,yValue:null,offsetX:0,offsetY:0,avoidOverlap:true,durationStart:null,durationEnd:null,durationWidth:4}};project.nodes=[base];
+    expect(resolvedTextPoint({id:'text',text:'Etiqueta',x:0,y:0,fontSize:16,fontWeight:400,color:'#000',opacity:1,rotation:0,align:'start',links:[],anchorTarget:'node:node',anchorValue:null,offsetX:5,offsetY:7,layerId},project)).toEqual({x:155,y:237});
   });
 });
