@@ -1,4 +1,15 @@
 .app.inspector-hidden { --right: 0px; }
+.power-dialog { width: min(1360px, 98vw); }
+.power-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:16px; }
+.power-card { min-height:220px; padding:14px; border:1px solid var(--line); border-radius:9px; background:#0b1018; }
+.power-card h3 svg { width:16px; height:16px; color:var(--accent); }
+.power-card input,.power-card textarea,.power-card button { width:100%; margin:4px 0; padding:8px; border:1px solid var(--line); border-radius:5px; background:#111827; font-size:10px; }
+.power-card textarea { min-height:90px; resize:vertical; }
+.power-card p,.power-card li,.power-card small { color:var(--muted); font-size:10px; line-height:1.5; }
+.button-grid { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+.lab-row { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 0; border-bottom:1px solid var(--line); color:#cbd5e1; font-size:9px; }
+.lab-row input { width:auto; }
+@media(max-width:850px){.power-grid{grid-template-columns:1fr}}
 .axis-line { stroke-opacity: .12; }
 .axis-line.major { stroke-opacity: .34; stroke-width: 1.4; }
 .resize-handle, .waypoint-handle { fill: #fff; stroke: #2563eb; stroke-width: 2; vector-effect: non-scaling-stroke; cursor: nwse-resize; }

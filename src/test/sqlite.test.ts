@@ -16,6 +16,6 @@ describe('SQLite Studio',()=>{
     const project=createBlankProject();project.title='Base portable';
     const restored=await projectFromDatabase(await projectToDatabase(project));
     expect(restored.title).toBe('Base portable');
-    expect(restored.version).toBe(7);
+    expect(restored.version).toBe(8);
   });
 });

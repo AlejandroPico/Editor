@@ -1,5 +1,5 @@
 export const PROJECT_FORMAT = 'atlas-editor-project';
-export const PROJECT_VERSION = 7;
+export const PROJECT_VERSION = 8;
 
 export type Id = string;
 export type AxisMode = 'none' | 'timeline' | 'numeric' | 'categories';
