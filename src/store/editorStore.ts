@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createBlankProject, normalizeProject, uid, type AtlasProject, type Camera, type Point, type Selection, type Tool } from '../model/project';
-import { axisContext, nodeCenter, positionAxisValue, resolvedNodeRect, snap } from '../lib/geometry';
+import { axisContext, nodeCenter, positionAxisValue, recalculateSemanticLayout, resolvedNodeRect, snap } from '../lib/geometry';
 
 interface EditorState {
   project: AtlasProject;
@@ -26,6 +26,7 @@ interface EditorState {
   addText: (point: Point) => void;
   relationClick: (nodeId: string) => void;
   moveSelection: (dx: number, dy: number, absolute?: Point) => void;
+  recalculatePositions: (resetOffsets?: boolean) => void;
   deleteSelection: () => void;
   markSaved: () => void;
 }
@@ -140,6 +141,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const deltaX=item.x-oldX,deltaY=item.y-oldY,selectedAreas=new Set(get().selection.filter(entry=>entry.type==='area').map(entry=>entry.id));let frontier=[item.id],guard=0;
         while(frontier.length&&guard++<draft.areas.length){const children=draft.areas.filter(area=>area.parentAreaId&&frontier.includes(area.parentAreaId)&&!selectedAreas.has(area.id));frontier=children.map(area=>area.id);for(const child of children){child.x+=deltaX;child.y+=deltaY}}
       }
+    }
+  }),
+  recalculatePositions: (resetOffsets = false) => get().updateProject('Recalcular ubicaciones', draft => {
+    recalculateSemanticLayout(draft, resetOffsets);
+    const nodes=new Set(draft.nodes.map(node=>node.id)),areas=new Set(draft.areas.map(area=>area.id));
+    for(const event of draft.events){event.entityIds=event.entityIds.filter(id=>nodes.has(id));event.areaIds=event.areaIds.filter(id=>areas.has(id))}
+    for(const text of draft.texts){
+      if(text.anchorTarget?.startsWith('node:')&&!nodes.has(text.anchorTarget.slice(5)))text.anchorTarget=null;
+      if(text.anchorTarget?.startsWith('area:')&&!text.anchorTarget.match(/^area:.+:[xy]$/)&&!areas.has(text.anchorTarget.slice(5)))text.anchorTarget=null;
     }
   }),
   deleteSelection: () => {

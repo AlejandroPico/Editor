@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { Beaker, Box, Database, Download, FileArchive, FileDown, FilePlus2, FolderOpen, PanelRightClose, PanelRightOpen, Redo2, Save, Settings2, Undo2 } from 'lucide-react';
+import { Beaker, Box, Database, Download, FileArchive, FileDown, FilePlus2, FolderOpen, PanelRightClose, PanelRightOpen, Recycle, Redo2, Save, Settings2, Undo2 } from 'lucide-react';
 import { useEditorStore } from '../store/editorStore';
 import { createProjectArchive, createViewerArchive, openProjectFile } from '../lib/archive';
-import { downloadBlob, downloadText, safeFileName } from '../lib/download';
+import { downloadBlob, downloadText, safeFileName, saveBlobWithDialog, versionedFileName } from '../lib/download';
 import { projectFromDatabase } from '../lib/sqlite';
 import { projectSvg } from '../lib/svgExport';
 
@@ -17,6 +17,7 @@ export function Topbar({ onSettings, onDatabase, onPowerTools, inspectorOpen, on
   const replaceProject = useEditorStore(state => state.replaceProject);
   const newProject = useEditorStore(state => state.newProject);
   const markSaved = useEditorStore(state => state.markSaved);
+  const recalculatePositions = useEditorStore(state => state.recalculatePositions);
   const [busy, setBusy] = useState('');
   const name = safeFileName(project.title);
 
@@ -35,11 +36,12 @@ export function Topbar({ onSettings, onDatabase, onPowerTools, inspectorOpen, on
     <div className="top-group">
       <button title="Proyecto nuevo" onClick={() => { if (!dirty || confirm('¿Descartar los cambios y crear un proyecto vacío?')) newProject(); }}><FilePlus2 size={17}/><span>Nuevo</span></button>
       <button title="Abrir JSON, SQLite o paquete ZIP" onClick={() => input.current?.click()}><FolderOpen size={17}/><span>Abrir</span></button>
-      <button title="Guardar paquete completo con JSON y SQLite" onClick={() => execute('Empaquetando…', async () => { downloadBlob(await createProjectArchive(project), `${name}.atlas.zip`); markSaved(); })}><Save size={17}/><span>Guardar</span></button>
+      <button title="Guardar paquete completo con JSON y SQLite eligiendo su ubicación" onClick={() => execute('Guardando…', async () => { const saved=await saveBlobWithDialog(()=>createProjectArchive(project),versionedFileName(project.title,'atlas.zip'),'Proyecto de Atlas Editor','application/zip',['.zip']);if(saved)markSaved() })}><Save size={17}/><span>Guardar</span></button>
     </div>
     <div className="top-group compact">
       <button disabled={!past} title="Deshacer" onClick={undo}><Undo2 size={17}/></button>
       <button disabled={!future} title="Rehacer" onClick={redo}><Redo2 size={17}/></button>
+      <button title="Recalcular ubicaciones semánticas y antisolapamiento. Mayús+clic también elimina las correcciones manuales." onClick={event=>recalculatePositions(event.shiftKey)}><Recycle size={17}/></button>
     </div>
     <div className="top-group export-group">
       <button title="Exportar SVG vectorial" onClick={() => downloadText(projectSvg(project), `${name}.svg`, 'image/svg+xml')}><FileDown size={17}/><span>SVG</span></button>

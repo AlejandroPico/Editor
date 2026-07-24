@@ -86,6 +86,33 @@ function resolvedLayout(project:AtlasProject):Map<string,Rect>{
 export function resolvedNodeRect(node:NodeEntity,project?:AtlasProject):Rect{return project?resolvedLayout(project).get(node.id)??rawNodeRect(node,project):rawNodeRect(node)}
 
 export function nodeCenter(node:NodeEntity,project?:AtlasProject):Point{const rect=resolvedNodeRect(node,project);return{x:rect.x+rect.width/2,y:rect.y+rect.height/2}}
+
+export function recalculateSemanticLayout(project:AtlasProject,resetOffsets=false):number{
+  const previous=new Map(project.nodes.map(node=>[node.id,resolvedNodeRect(node,project)])),areaIds=new Set(project.areas.map(area=>area.id));let count=0;
+  layoutCache.delete(project);
+  for(const node of project.nodes){
+    if(node.placement.mode!=='semantic')continue;count+=1;
+    if(node.placement.areaId&&!areaIds.has(node.placement.areaId))node.placement.areaId=null;
+    node.areaIds=node.areaIds.filter(id=>areaIds.has(id));
+    const area=project.areas.find(candidate=>candidate.id===node.placement.areaId),before=previous.get(node.id)??{x:node.x,y:node.y,width:node.width,height:node.height};
+    for(const orientation of ['x','y'] as const){
+      const context=axisContext(project,area,orientation),key=orientation==='x'?'xValue':'yValue',value=node.placement[key];
+      if(!context)continue;
+      const valid=axisValuePosition(context.axis,value,context.start,context.length);
+      if(valid==null){
+        const position=orientation==='x'?before.x+before.width/2:before.y+before.height/2;
+        node.placement[key]=positionAxisValue(context.axis,position,context.start,context.length);
+      }
+    }
+    if(resetOffsets){node.placement.offsetX=0;node.placement.offsetY=0}
+  }
+  layoutCache.delete(project);
+  const refreshed=new Map(project.nodes.filter(node=>node.placement.mode==='semantic').map(node=>[node.id,resolvedNodeRect(node,project)]));
+  for(const node of project.nodes){const rect=refreshed.get(node.id);if(rect){node.x=rect.x;node.y=rect.y}}
+  layoutCache.delete(project);
+  return count;
+}
+
 export function edgePoints(edge:EdgeEntity,source:NodeEntity,target:NodeEntity,project?:AtlasProject):Point[]{return[nodeCenter(source,project),...edge.waypoints,nodeCenter(target,project)]}
 
 export function parallelEdgeOffset(edge:EdgeEntity,project?:AtlasProject):number{

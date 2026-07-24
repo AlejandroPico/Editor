@@ -49,6 +49,8 @@ No existe un servidor obligatorio. La aplicación completa puede ejecutarse desd
 - Esquema de entidades configurable: secciones y campos propios de texto, número, fecha, enlace, lista o sí/no; los valores aparecen en el inspector y en la ficha del visor.
 - SQLite Studio interno con explorador de tablas y vistas, esquema, previsualización de filas, consola SQL y un historial de modificaciones reproducible.
 - Confirmación antes de eliminaciones desde la interfaz.
+- Guardado mediante el diálogo nativo del sistema cuando el navegador lo permite, con nombre versionado `proyecto_aaaa-mm-dd_hh-mm-ss.atlas.zip` y descarga compatible como alternativa.
+- Recálculo manual de ubicaciones semánticas para reparar referencias de eje o área, regenerar el antisolapamiento y actualizar conexiones y anclajes.
 
 ## Formatos de salida
 

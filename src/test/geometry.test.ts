@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { axisBands, axisChapterBands, axisValueRatio, edgePath, eventSegments, pointInRect, resolvedNodeRect, resolvedTextPoint, snap } from '../lib/geometry';
+import { axisBands, axisChapterBands, axisValueRatio, edgePath, eventSegments, pointInRect, recalculateSemanticLayout, resolvedNodeRect, resolvedTextPoint, snap } from '../lib/geometry';
 import { createBlankProject } from '../model/project';
 
 describe('geometría vectorial', () => {
@@ -39,5 +39,12 @@ describe('geometría vectorial', () => {
     expect(eventSegments(event,project)[0]).toMatchObject({x1:0,x2:project.board.width,y1:project.board.height/2,y2:project.board.height/2});
     const base={id:'node',title:'Nodo',subtitle:'',visibleValue:'',x:100,y:200,width:100,height:60,rotation:0,shape:'rounded' as const,fill:'#fff',stroke:'#000',strokeWidth:1,opacity:1,iconScale:1,containerVisible:true,layerId,type:'entity',status:'active',summary:'',details:{},customFields:{},tags:[],areaIds:[],placement:{mode:'free' as const,areaId:null,xValue:null,yValue:null,offsetX:0,offsetY:0,avoidOverlap:true,durationStart:null,durationEnd:null,durationWidth:4}};project.nodes=[base];
     expect(resolvedTextPoint({id:'text',text:'Etiqueta',x:0,y:0,fontSize:16,fontWeight:400,color:'#000',opacity:1,rotation:0,align:'start',links:[],anchorTarget:'node:node',anchorValue:null,offsetX:5,offsetY:7,layerId},project)).toEqual({x:155,y:237});
+  });
+  it('repara categorías semánticas desaparecidas y conserva coordenadas de respaldo',()=>{
+    const project=createBlankProject(),layerId=project.activeLayerId;project.board.axes.x={...project.board.axes.x,mode:'categories',visible:true,categories:[{id:'europa',label:'Europa',weight:1}]};project.board.axes.y={...project.board.axes.y,mode:'timeline',visible:true,min:0,max:2000};
+    const node={id:'semantic',title:'Entidad',subtitle:'',visibleValue:'',x:100,y:100,width:100,height:60,rotation:0,shape:'rounded' as const,fill:'#fff',stroke:'#000',strokeWidth:1,opacity:1,iconScale:1,containerVisible:true,layerId,type:'entity',status:'active',summary:'',details:{},customFields:{},tags:[],areaIds:[],placement:{mode:'semantic' as const,areaId:null,xValue:'Categoría eliminada',yValue:1000,offsetX:0,offsetY:0,avoidOverlap:true,durationStart:null,durationEnd:null,durationWidth:4}};project.nodes=[node];
+    expect(recalculateSemanticLayout(project)).toBe(1);
+    expect(node.placement.xValue).toBe('Europa');
+    expect(Number.isFinite(node.x)&&Number.isFinite(node.y)).toBe(true);
   });
 });
